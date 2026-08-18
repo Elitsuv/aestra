@@ -22,7 +22,6 @@ Execute a compiled target with enforced POSIX limits:
 aestra run ./solution.out \
   --time-limit 2000 \
   --memory-limit 512 \
-  < input.txt
 ```
 
 **Output Example:**
