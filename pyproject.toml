@@ -1,0 +1,19 @@
+[project]
+name = "aestra"
+version = "0.1.0"
+description = "A hybrid competitive programming execution sandbox."
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy"
+]
+
+[tool.ruff]
+line-length = 88
+src = ["."]
+
+[tool.mypy]
+strict = true
+mypy_path = "."
