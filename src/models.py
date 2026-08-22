@@ -16,7 +16,7 @@ class ExecutionStatus(str, Enum):
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
     def __str__(self) -> str:
-        return self.value
+        return str(self.value)
 
 
 @dataclass(frozen=True)
@@ -36,4 +36,12 @@ class ExecutionResult:
 
     @property
     def is_success(self) -> bool:
-        return self.status in (ExecutionStatus.SUCCESS, ExecutionStatus.OK, ExecutionStatus.ACCEPTED) and self.exit_code == 0
+        return (
+            self.status
+            in (
+                ExecutionStatus.SUCCESS,
+                ExecutionStatus.OK,
+                ExecutionStatus.ACCEPTED,
+            )
+            and self.exit_code == 0
+        )
