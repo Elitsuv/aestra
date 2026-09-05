@@ -1,3 +1,7 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
 [project]
 name = "aestra"
 version = "0.1.0"
@@ -9,6 +13,10 @@ dev = [
     "ruff",
     "mypy"
 ]
+
+[tool.maturin]
+module-name = "aestra_core"
+features = ["pyo3/extension-module"]
 
 [tool.ruff]
 line-length = 88
