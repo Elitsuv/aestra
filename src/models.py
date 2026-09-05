@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class ExecutionStatus(str, Enum):
@@ -28,7 +27,7 @@ class ExecutionResult:
     peak_memory_bytes: int = 0
     stdout: str = ""
     stderr: str = ""
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     @property
     def peak_memory_mb(self) -> float:

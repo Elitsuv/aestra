@@ -1,0 +1,59 @@
+name: "🐛 Bug Report"
+description: "File a bug report to help us improve Aestra execution engine"
+title: "[BUG]: "
+labels: ["type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please fill out the sections below.
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: "e.g. Memory limit enforcement fails on Windows Job Objects when allocating over 1GB."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Domain Subsystem
+      description: Which part of Aestra is affected?
+      options:
+        - "domain: rust-core (Native execution, Job Objects, setrlimit, PyO3)"
+        - "domain: python-core (CLI orchestrator, test runner, config, checker)"
+        - "CI/CD / Tooling"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Compile `solution.cpp` with `g++`
+        2. Run `aestra run ./solution.exe --memory-limit 512`
+        3. See error ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Info
+      description: OS version, Python version, Rust version.
+      placeholder: "Windows 11 / Linux Ubuntu 22.04 | Python 3.11 | Rust 1.75"
+    validations:
+      required: false

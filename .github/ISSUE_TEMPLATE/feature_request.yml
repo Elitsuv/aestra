@@ -1,0 +1,38 @@
+name: "🚀 Feature Request"
+description: "Suggest an idea or enhancement for Aestra"
+title: "[FEAT]: "
+labels: ["type: feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping make Aestra better! Please describe your proposed feature.
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: Is your feature request related to a problem or new capability?
+      placeholder: "e.g. Add floating point epsilon output comparison mode to the CP checker."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Target Subsystem Boundary
+      description: Which component will be modified?
+      options:
+        - "domain: rust-core (Native sandboxing, PyO3, process limits)"
+        - "domain: python-core (CLI orchestrator, test runner, config, checker)"
+        - "CI/CD / Tooling"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution & Design
+      description: Describe how you envision this working.
+    validations:
+      required: false

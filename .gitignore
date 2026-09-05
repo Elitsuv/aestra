@@ -1,5 +1,31 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
 .coverage
+.mypy_cache/
+.ruff_cache/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Rust / Maturin Build Artifacts
+/target/
+*.so
+*.pyd
+*.dylib
+*.dll
+dist/
+wheels/
+*.egg-info/
+.eggs/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

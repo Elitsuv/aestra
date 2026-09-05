@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  python-quality:
+    name: Python Quality & Type Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Linting Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy
+
+      - name: Run Ruff Lint Check
+        run: ruff check .
+
+      - name: Run Ruff Format Check
+        run: ruff format --check .
+
+      - name: Run Mypy Type Check
+        run: mypy src/
+
+  rust-quality:
+    name: Rust Core Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Set up Python for Maturin
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Maturin
+        run: pip install maturin
+
+      - name: Check Rust Formatting
+        if: hashFiles('Cargo.toml') != ''
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy Linter
+        if: hashFiles('Cargo.toml') != ''
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run Cargo Unit Tests
+        if: hashFiles('Cargo.toml') != ''
+        run: cargo test --all
+
+      - name: Test Maturin Build
+        if: hashFiles('Cargo.toml') != ''
+        run: maturin build --release
