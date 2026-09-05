@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Helper script to sync GitHub labels for Aestra repository according to contributing.md.
 Requires GitHub CLI (`gh`) installed and authenticated (`gh auth login`).
