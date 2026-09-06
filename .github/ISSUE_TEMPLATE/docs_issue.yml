@@ -1,0 +1,55 @@
+name: "📚 Documentation & Example Issue"
+description: "Suggest improvements to README, architecture diagrams, FFI guides, or CP benchmark docs."
+title: "[DOCS]: "
+labels: ["type: docs"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        <div align="center">
+          <img src="https://raw.githubusercontent.com/Elitsuv/aestra/main/assets/aestra.png" width="100" alt="Aestra Logo">
+          <h2>Aestra Documentation & Guide Issue</h2>
+          <p>Help us make Aestra's architecture and setup guides clear and accessible.</p>
+        </div>
+
+        ---
+
+  - type: input
+    id: summary
+    attributes:
+      label: Documentation Issue Title
+      description: What documentation, guide, or example needs improvement?
+      placeholder: "e.g. Add PyO3 zero-cost FFI architecture diagram to README."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: doc-target
+    attributes:
+      label: Target Documentation Area
+      description: Select which document or guide needs attention.
+      options:
+        - "README.md (Project Overview & Quickstart)"
+        - "contributing.md (Developer Setup & Engineering Standards)"
+        - "Architecture Specs & FFI Bridge Guides"
+        - "Example CP Judge Configurations & Testcases"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-doc
+    attributes:
+      label: Proposed Content or Changes
+      description: Describe what changes, diagrams, or explanations should be added or updated.
+      placeholder: "Describe the proposed documentation updates here..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proof-references
+    attributes:
+      label: Screenshots or Reference Links
+      description: Attach screenshots of formatting bugs, diagrams, or external reference links.
+      placeholder: "Drag & drop screenshots or reference links here..."
+    validations:
+      required: false

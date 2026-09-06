@@ -1,0 +1,62 @@
+name: PR Quality Summary Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  pr-quality-comment:
+    name: Post PR Quality Summary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Quality Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy
+
+      - name: Run Quality Checks & Generate Report
+        id: checks
+        run: |
+          cat << 'EOF' > pr_report.md
+          ### 🚀 Aestra PR Code Quality Audit
+
+          | Audit Check | Tool | Status |
+          | :--- | :--- | :--- |
+          EOF
+
+          # Check Ruff Linting & Formatting
+          if ruff check . && ruff format --check .; then
+            echo "| **Python Formatting & Lint** | `ruff` | ✅ Passed |" >> pr_report.md
+          else
+            echo "| **Python Formatting & Lint** | `ruff` | ❌ Issues Found |" >> pr_report.md
+          fi
+
+          # Check Mypy Types
+          if mypy src/; then
+            echo "| **Static Type Check** | `mypy` | ✅ Passed |" >> pr_report.md
+          else
+            echo "| **Static Type Check** | `mypy` | ❌ Type Errors |" >> pr_report.md
+          fi
+
+          cat << 'EOF' >> pr_report.md
+
+          ---
+          *Automated PR Quality Audit powered by Aestra Actions Bot.*
+          EOF
+
+      - name: Comment PR Audit Summary
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          filePath: pr_report.md
+          comment_tag: pr_quality_audit

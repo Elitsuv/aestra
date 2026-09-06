@@ -1,0 +1,56 @@
+name: "⚡ Performance & Sandboxing Issue"
+description: "Report high CPU overhead, memory measurement drift, or IPC latency regressions."
+title: "[PERF]: "
+labels: ["type: perf"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        <div align="center">
+          <img src="https://raw.githubusercontent.com/Elitsuv/aestra/main/assets/aestra.png" width="100" alt="Aestra Logo">
+          <h2>Aestra Performance Benchmark Issue</h2>
+          <p>Help us maintain microsecond-precision timing and zero-cost FFI overhead.</p>
+        </div>
+
+        ---
+
+  - type: input
+    id: summary
+    attributes:
+      label: Performance Issue Title
+      description: Concise title summarizing the performance bottleneck or measurement drift.
+      placeholder: "e.g. PyO3 string conversion overhead adds 2ms latency on 10,000 rapid executions."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Subsystem Boundary
+      description: Where is the performance bottleneck occurring?
+      options:
+        - "domain: rust-core (PyO3 FFI overhead, POSIX system calls, process spawning)"
+        - "domain: python-core (CLI parsing, string formatting, batch test concurrency)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: benchmark-results
+    attributes:
+      label: Benchmark Results & Telemetry Metrics
+      description: Share your measured execution times, memory usage, CPU time, or wall clock metrics.
+      placeholder: |
+        - Expected Overhead: <0.5ms per execution
+        - Measured Overhead: 4.2ms per execution
+        - Tested Sample Size: 1,000 test cases
+    validations:
+      required: true
+
+  - type: textarea
+    id: flamegraphs-proof
+    attributes:
+      label: Profiler Traces & Screenshots
+      description: Attach flamegraphs, valgrind traces, perf logs, or terminal screenshots demonstrating the bottleneck.
+      placeholder: "Drag & drop flamegraphs, perf reports, or screenshots here..."
+    validations:
+      required: false
