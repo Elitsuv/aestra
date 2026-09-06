@@ -1,18 +1,12 @@
-name: "⚡ Performance & Sandboxing Issue"
-description: "Report high CPU overhead, memory measurement drift, or IPC latency regressions."
+name: "Performance & Sandboxing Issue"
+description: "Report CPU overhead, memory measurement drift, or IPC latency regressions."
 title: "[PERF]: "
 labels: ["type: perf"]
 body:
   - type: markdown
     attributes:
       value: |
-        <div align="center">
-          <img src="https://raw.githubusercontent.com/Elitsuv/aestra/main/assets/aestra.png" width="100" alt="Aestra Logo">
-          <h2>Aestra Performance Benchmark Issue</h2>
-          <p>Help us maintain microsecond-precision timing and zero-cost FFI overhead.</p>
-        </div>
-
-        ---
+        Report performance bottlenecks or measurement drift. Please review our [Contributing Guidelines](https://github.com/Elitsuv/aestra/blob/main/contributing.md).
 
   - type: input
     id: summary
@@ -27,7 +21,7 @@ body:
     id: domain
     attributes:
       label: Subsystem Boundary
-      description: Where is the performance bottleneck occurring?
+      description: Where is the performance bottleneck occurring? (see contributing.md)
       options:
         - "domain: rust-core (PyO3 FFI overhead, POSIX system calls, process spawning)"
         - "domain: python-core (CLI parsing, string formatting, batch test concurrency)"
@@ -50,7 +44,7 @@ body:
     id: flamegraphs-proof
     attributes:
       label: Profiler Traces & Screenshots
-      description: Attach flamegraphs, valgrind traces, perf logs, or terminal screenshots demonstrating the bottleneck.
+      description: Attach flamegraphs, valgrind traces, perf logs, or terminal screenshots.
       placeholder: "Drag & drop flamegraphs, perf reports, or screenshots here..."
     validations:
       required: false

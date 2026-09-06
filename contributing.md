@@ -1,85 +1,52 @@
-# Contributing to Aestra
+# Contributing Guidelines
 
-We operate under strict engineering standards to maintain a production-grade FFI boundary and execution sandbox. All contributions must adhere to the hybrid architecture design and utilize our standardized Pull Request (PR) lifecycle.
+Contributions to Aestra are welcome. We maintain strict engineering standards to preserve deterministic execution and FFI boundary safety.
 
-## Local Development Setup
+## Development Setup
 
-Aestra relies on a zero-overhead Foreign Function Interface (FFI) utilizing PyO3, compiled via `maturin`.
+### Prerequisites
+- **Rust**: 1.75.0+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- **Python**: 3.10+
 
-### 1. Toolchain Requirements
-* **Rust (1.70.0+)**: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-* **Python (3.10+)**: Ensure `pip` and `venv` are available.
-
-### 2. Environment Initialization
-
+### Environment Setup
 ```bash
-git clone https://github.com/elitsuv/aestra.git
+git clone https://github.com/Elitsuv/aestra.git
 cd aestra
 
-# Initialize the isolated Python environment
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install the build backend and compile the Rust core
 pip install maturin
-maturin develop --release
+maturin develop
 ```
 
-## Engineering Standards
+## Quality Standards
 
-To preserve bare-metal performance and deterministic execution, you must enforce the following standards before opening a PR:
+Before submitting a Pull Request, verify that all linters pass locally:
 
-### Rust (`aestra_core`)
-* **Memory Safety**: Avoid `unsafe` blocks unless interfacing directly with `libc` or `nix` syscalls (`fork`, `execve`, `setrlimit`). Document all safety invariants.
-* **Linting**: Code must pass standard strict lints.
+### Python
+```bash
+ruff check .
+ruff format --check .
+mypy src/
+```
 
+### Rust
 ```bash
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-### Python (`aestra`)
-* **Typing**: Strict type hinting is mandatory. Use dataclasses for immutable state transfer.
-* **Linting**: Code must be formatted and linted using `ruff` and `mypy`.
-
-```bash
-ruff check .
-ruff format --check .
-mypy aestra/
-```
-
 ## Pull Request Lifecycle
 
-* **Branch Nomenclature**: Create a scoped branch (e.g., `feat/parallel-fuzzer`, `fix/zombie-process`, `perf/rayon-pool`).
-* **Atomic Commits**: Keep commits logical and isolated. Write imperative commit messages ("Enforce rlimit AS boundaries" not "added memory limits").
-* **PR Submission**: Open the PR against the `main` branch.
-* **Mandatory Labels**: You must attach exactly one Size, one Type, and at least one Domain label before requesting a review.
+1. **Branch Naming**: Use scoped branch names (`feat/sandbox-limits`, `fix/zombie-pid`).
+2. **Atomic Commits**: Write clear, imperative commit messages (`feat(rust-core): enforce rlimit AS`).
+3. **PR Submission**: Target `main`. Ensure CI checks and PR quality audit pass.
 
-## Repository Labeling System
+## Label Taxonomy
 
-Our automated changelogs and review pipelines depend on strict Git labeling hygiene. You must configure and use these exact labels:
+Attach appropriate labels to your PR:
 
-### 1. Size Labels
-Indicates the PR review overhead.
-
-* **`size: xsmall`** — Under 10 lines (Typos, quick fixes).
-* **`size: small`** — Under 50 lines.
-* **`size: mid`** — Under 250 lines (Standard feature).
-* **`size: large`** — Under 1,000 lines (Requires deep architectural review).
-* **`size: xlarge`** — Over 1,000 lines (Should be split into atomic PRs).
-
-### 2. Type Labels
-Categorizes the nature of the change.
-
-* **`type: feature`** — New functionality or algorithm.
-* **`type: bug`** — Critical execution or logic flaw resolution.
-* **`type: perf`** — Codebase optimization (e.g., threading, memory allocation).
-* **`type: refactor`** — Restructuring existing logic without altering external behavior.
-* **`type: chore`** — CI/CD, Maturin config, or dependency bumps.
-* **`type: docs`** — README, docstrings, or architecture diagrams.
-
-### 3. Domain Labels
-Identifies the subsystem boundary.
-
-* **`domain: rust-core`** — Changes to the POSIX sandbox, Rayon threading, or PyO3 bridge.
-* **`domain: python-core`** — Changes to the CLI orchestrator, configuration, or algorithms.
+- **Size**: `size: xsmall` (<10 lines), `size: small` (<50 lines), `size: mid` (<250 lines), `size: large` (<1000 lines).
+- **Type**: `type: feature`, `type: bug`, `type: perf`, `type: refactor`, `type: chore`, `type: docs`.
+- **Domain**: `domain: rust-core` (Rust engine, PyO3 FFI, sandbox) or `domain: python-core` (CLI, config, checker).

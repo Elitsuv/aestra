@@ -1,18 +1,12 @@
-name: "📚 Documentation & Example Issue"
-description: "Suggest improvements to README, architecture diagrams, FFI guides, or CP benchmark docs."
+name: "Documentation Issue"
+description: "Suggest improvements to README, architecture specs, FFI guides, or benchmarks."
 title: "[DOCS]: "
 labels: ["type: docs"]
 body:
   - type: markdown
     attributes:
       value: |
-        <div align="center">
-          <img src="https://raw.githubusercontent.com/Elitsuv/aestra/main/assets/aestra.png" width="100" alt="Aestra Logo">
-          <h2>Aestra Documentation & Guide Issue</h2>
-          <p>Help us make Aestra's architecture and setup guides clear and accessible.</p>
-        </div>
-
-        ---
+        Suggest documentation updates or improvements. Please review our [Contributing Guidelines](https://github.com/Elitsuv/aestra/blob/main/contributing.md).
 
   - type: input
     id: summary

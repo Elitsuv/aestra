@@ -1,38 +1,57 @@
-name: "🚀 Feature Request"
-description: "Suggest an idea or enhancement for Aestra"
+name: "Feature Request"
+description: "Propose a new execution capability, CP platform integration, or architecture enhancement."
 title: "[FEAT]: "
 labels: ["type: feature"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for helping make Aestra better! Please describe your proposed feature.
+        Propose a new feature or architectural improvement. Please review our [Contributing Guidelines](https://github.com/Elitsuv/aestra/blob/main/contributing.md) before submitting.
 
-  - type: textarea
-    id: feature-description
+  - type: input
+    id: summary
     attributes:
-      label: Feature Description
-      description: Is your feature request related to a problem or new capability?
-      placeholder: "e.g. Add floating point epsilon output comparison mode to the CP checker."
+      label: Feature Title
+      description: A concise headline describing your proposed feature.
+      placeholder: "e.g. Add floating point epsilon output comparison mode to CP answer checker."
     validations:
       required: true
 
   - type: dropdown
     id: domain
     attributes:
-      label: Target Subsystem Boundary
-      description: Which component will be modified?
+      label: Subsystem Boundary
+      description: Which part of Aestra will this feature modify? (see contributing.md)
       options:
-        - "domain: rust-core (Native sandboxing, PyO3, process limits)"
+        - "domain: rust-core (Native sandboxing, POSIX limits, PyO3 FFI)"
         - "domain: python-core (CLI orchestrator, test runner, config, checker)"
-        - "CI/CD / Tooling"
+        - "CI/CD & Repository Infrastructure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-motivation
+    attributes:
+      label: Problem Statement & Motivation
+      description: What problem does this feature solve? Why is it useful?
+      placeholder: "Currently, answers with floating point outputs (e.g. 3.14159 vs 3.1416) fail exact string matching..."
     validations:
       required: true
 
   - type: textarea
     id: proposed-solution
     attributes:
-      label: Proposed Solution & Design
-      description: Describe how you envision this working.
+      label: Proposed Solution & Technical Design
+      description: Describe how you envision this working technically (API signatures, CLI flags, rust structures).
+      render: rust
+    validations:
+      required: false
+
+  - type: textarea
+    id: visual-mockups
+    attributes:
+      label: Screenshots, Wireframes, or References
+      description: Attach screenshots, diagrams, or links to similar tools for visual context.
+      placeholder: "Drag & drop diagrams or reference links here..."
     validations:
       required: false

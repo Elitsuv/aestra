@@ -1,31 +1,31 @@
-name: "🐛 Bug Report"
-description: "File a bug report to help us improve Aestra execution engine"
+name: "Bug Report"
+description: "Report an execution sandbox error, memory measurement failure, or crash."
 title: "[BUG]: "
 labels: ["type: bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting an issue! Please fill out the sections below.
+        Thank you for filing a bug report. Please review our [Contributing Guidelines](https://github.com/Elitsuv/aestra/blob/main/contributing.md) before submitting.
 
-  - type: textarea
-    id: bug-description
+  - type: input
+    id: summary
     attributes:
-      label: Bug Description
-      description: A clear and concise description of what the bug is.
-      placeholder: "e.g. Memory limit enforcement fails on Windows Job Objects when allocating over 1GB."
+      label: Bug Summary
+      description: A clear and concise headline describing the issue.
+      placeholder: "e.g. Memory limit enforcement fails on Linux cgroups when allocating contiguous 1GB arrays."
     validations:
       required: true
 
   - type: dropdown
     id: domain
     attributes:
-      label: Domain Subsystem
-      description: Which part of Aestra is affected?
+      label: Subsystem Boundary
+      description: Select the primary subsystem affected by this bug (see contributing.md).
       options:
-        - "domain: rust-core (Native execution, Job Objects, setrlimit, PyO3)"
+        - "domain: rust-core (Native sandboxing, POSIX setrlimit/wait4, PyO3 FFI)"
         - "domain: python-core (CLI orchestrator, test runner, config, checker)"
-        - "CI/CD / Tooling"
+        - "CI/CD & Repository Infrastructure"
     validations:
       required: true
 
@@ -33,27 +33,50 @@ body:
     id: reproduction
     attributes:
       label: Steps to Reproduce
-      description: Steps to reproduce the behavior.
+      description: Provide detailed steps or a small code snippet to reproduce the bug.
       placeholder: |
-        1. Compile `solution.cpp` with `g++`
-        2. Run `aestra run ./solution.exe --memory-limit 512`
-        3. See error ...
+        1. Compile `solution.cpp` with `g++ -O2 solution.cpp -o solution.out`
+        2. Run `aestra run ./solution.out --memory-limit 512`
+        3. Observe execution verdict ...
     validations:
       required: true
 
   - type: textarea
-    id: expected-behavior
+    id: expected-actual
     attributes:
-      label: Expected Behavior
-      description: A clear description of what you expected to happen.
+      label: Expected vs Actual Behavior
+      description: What did you expect to happen, and what actually happened instead?
+      placeholder: |
+        - Expected: Verdict `MEMORY_LIMIT_EXCEEDED` with peak memory ~512MB.
+        - Actual: Process crashed with SIGSEGV (exit code 139) without memory verdict.
     validations:
       required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Terminal Output & Tracebacks
+      description: Copy and paste relevant terminal logs, panic tracebacks, or debug output.
+      render: shell
+
+  - type: textarea
+    id: proof-screenshots
+    attributes:
+      label: Screenshots & Visual Proof
+      description: Drag & drop screenshots, terminal captures, or memory profile graphs.
+      placeholder: "Drag & drop screenshots or paste image URLs here..."
+    validations:
+      required: false
 
   - type: textarea
     id: environment
     attributes:
       label: Environment Info
-      description: OS version, Python version, Rust version.
-      placeholder: "Windows 11 / Linux Ubuntu 22.04 | Python 3.11 | Rust 1.75"
+      description: Provide OS version, Python version, Rust version, and CPU architecture.
+      placeholder: |
+        - OS: Ubuntu 22.04 LTS / Windows 11 (WSL2)
+        - Python Version: 3.11.4
+        - Rust Version: rustc 1.75.0
+        - Architecture: x86_64
     validations:
-      required: false
+      required: true
