@@ -7,6 +7,9 @@
 
 <br><br>
 
+> [!WARNING]
+> **Under Active Development**: Aestra is currently in pre-release (`v0.1.0-beta`). Core sandbox APIs, CLI interfaces, and telemetry models are actively evolving.
+
 Aestra is a deterministic execution sandbox and testcase engine built to accurately enforce hardware constraints (CPU Time Limit and Peak RAM Limit) on untrusted binaries with microsecond precision.
 
 ## Quickstart
