@@ -11,7 +11,8 @@ requires-python = ">=3.10"
 [project.optional-dependencies]
 dev = [
     "ruff",
-    "mypy"
+    "mypy",
+    "pytest"
 ]
 
 [tool.maturin]
@@ -25,3 +26,10 @@ src = ["."]
 [tool.mypy]
 strict = true
 mypy_path = "."
+
+[[tool.mypy.overrides]]
+module = "aestra_core"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

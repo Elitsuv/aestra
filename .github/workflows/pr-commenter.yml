@@ -29,31 +29,25 @@ jobs:
         id: checks
         run: |
           cat << 'EOF' > pr_report.md
-          ### 🚀 Aestra PR Code Quality Audit
+          ### PR Code Quality Audit
 
-          | Audit Check | Tool | Status |
+          | Check | Tool | Status |
           | :--- | :--- | :--- |
           EOF
 
           # Check Ruff Linting & Formatting
           if ruff check . && ruff format --check .; then
-            echo "| **Python Formatting & Lint** | `ruff` | ✅ Passed |" >> pr_report.md
+            echo "| Python Lint & Format | `ruff` | Passed |" >> pr_report.md
           else
-            echo "| **Python Formatting & Lint** | `ruff` | ❌ Issues Found |" >> pr_report.md
+            echo "| Python Lint & Format | `ruff` | Issues Found |" >> pr_report.md
           fi
 
           # Check Mypy Types
           if mypy src/; then
-            echo "| **Static Type Check** | `mypy` | ✅ Passed |" >> pr_report.md
+            echo "| Type Check | `mypy` | Passed |" >> pr_report.md
           else
-            echo "| **Static Type Check** | `mypy` | ❌ Type Errors |" >> pr_report.md
+            echo "| Type Check | `mypy` | Type Errors |" >> pr_report.md
           fi
-
-          cat << 'EOF' >> pr_report.md
-
-          ---
-          *Automated PR Quality Audit powered by Aestra Actions Bot.*
-          EOF
 
       - name: Comment PR Audit Summary
         uses: thollander/actions-comment-pull-request@v2
