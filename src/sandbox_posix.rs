@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 use std::ffi::CString;
 
 #[derive(Debug)]
@@ -152,10 +154,10 @@ pub fn execute_posix(
 
         libc::wait4(pid, &mut status, 0, &mut rusage);
 
-        let user_cpu_ms = (rusage.ru_utime.tv_sec as f64 * 1000.0)
-            + (rusage.ru_utime.tv_usec as f64 / 1000.0);
-        let sys_cpu_ms = (rusage.ru_stime.tv_sec as f64 * 1000.0)
-            + (rusage.ru_stime.tv_usec as f64 / 1000.0);
+        let user_cpu_ms =
+            (rusage.ru_utime.tv_sec as f64 * 1000.0) + (rusage.ru_utime.tv_usec as f64 / 1000.0);
+        let sys_cpu_ms =
+            (rusage.ru_stime.tv_sec as f64 * 1000.0) + (rusage.ru_stime.tv_usec as f64 / 1000.0);
         let total_cpu_time_ms = user_cpu_ms + sys_cpu_ms;
 
         let peak_memory_bytes = (rusage.ru_maxrss as u64) * 1024;
@@ -199,4 +201,3 @@ pub fn execute_posix(
         }
     }
 }
-

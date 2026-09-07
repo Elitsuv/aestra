@@ -27,5 +27,9 @@ src = ["."]
 strict = true
 mypy_path = "."
 
+[[tool.mypy.overrides]]
+module = "aestra_core"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = ["."]

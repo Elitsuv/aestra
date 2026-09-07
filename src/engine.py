@@ -62,7 +62,7 @@ class NativeEngine(BaseEngine):
         args: list[str] | None = None,
     ) -> ExecutionResult:
         try:
-            import aestra_core  # type: ignore[import-not-found]
+            import aestra_core
 
             cmd_args = args if args is not None else []
             telemetry = aestra_core.execute_native(
