@@ -1,38 +1,29 @@
-## Description
+### Summary
+<!-- Provide a clear, concise 1-2 sentence overview of what this PR introduces or fixes -->
 
-Provide a clear and concise description of the changes introduced in this PR.
+### Context & Motivation
+<!-- Why is this change necessary? What problem or feature does it address? -->
 
-Fixes #(issue number)
+### Key Changes
+<!-- Group changes logically (e.g. Rust Core, Python Engine, Tests, CI/Tooling) -->
+- **Component Name**:
+  - Description of change 1
+  - Description of change 2
 
-## Type of Change
+### Related Issue
+<!-- Reference the issue number this PR closes or relates to -->
+Closes #
 
-Select all that apply:
-- [ ] `type: feature` (New feature or functionality)
-- [ ] `type: bug` (Bug fix)
-- [ ] `type: perf` (Performance optimization)
-- [ ] `type: refactor` (Code restructuring without behavior changes)
-- [ ] `type: chore` (Dependencies, tooling, CI/CD)
-- [ ] `type: docs` (Documentation updates)
+### Testing & Verification
+<!-- Describe the tests you ran to verify your changes. Include commands and results -->
+- **Automated Tests**:
+  - `pytest` (passed)
+  - `cargo test --all` (passed)
+- **Manual / Integration Checks**:
+  - Details of any manual CLI or binary tests performed
 
-## PR Size Category
-
-Select one:
-- [ ] `size: xsmall` (<10 lines)
-- [ ] `size: small` (<50 lines)
-- [ ] `size: mid` (<250 lines)
-- [ ] `size: large` (<1000 lines)
-- [ ] `size: xlarge` (>1000 lines)
-
-## Domain Boundary
-
-Select all that apply:
-- [ ] `domain: rust-core` (Rust native engine, PyO3 FFI, sandbox)
-- [ ] `domain: python-core` (Python CLI, models, config, test harness)
-
-## Checklist
-
-- [ ] My code passes `ruff check .` and `ruff format --check .`
-- [ ] My code passes `mypy src/`
-- [ ] (If modifying Rust) `cargo fmt --all -- --check` and `cargo clippy` pass cleanly
-- [ ] Automated tests pass locally
-- [ ] I have updated the documentation accordingly
+### Pre-Merge Checklist
+- [ ] All automated tests pass locally
+- [ ] Code is formatted (`ruff format .` / `cargo fmt --all`)
+- [ ] Linters & type checkers pass with 0 errors (`ruff check .`, `mypy src/`, `cargo clippy`)
+- [ ] No temporary debug code or extraneous files committed
