@@ -1,5 +1,5 @@
 from src.config import ExecutionLimits
-from src.engine import BaseEngine, MockEngine
+from src.engine import BaseEngine, MockEngine, NativeEngine
 from src.models import ExecutionResult, ExecutionStatus
 
 __all__ = [
@@ -8,4 +8,5 @@ __all__ = [
     "ExecutionResult",
     "ExecutionStatus",
     "MockEngine",
+    "NativeEngine",
 ]

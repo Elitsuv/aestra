@@ -9,11 +9,13 @@ __pycache__/
 
 # Virtual Environments
 .venv/
+.venv-wsl/
 venv/
 env/
 ENV/
 
 # Rust / Maturin Build Artifacts
+target/
 /target/
 *.so
 *.pyd
