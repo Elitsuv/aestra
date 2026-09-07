@@ -9,12 +9,24 @@ from src.models import ExecutionResult, ExecutionStatus
 
 class BaseEngine(abc.ABC):
     @abc.abstractmethod
-    def execute(self, source_path: Path, limits: ExecutionLimits) -> ExecutionResult:
+    def execute(
+        self,
+        source_path: Path,
+        limits: ExecutionLimits,
+        input_data: str = "",
+        args: list[str] | None = None,
+    ) -> ExecutionResult:
         """Executes the source file strictly within the provided hardware limits."""
 
 
 class MockEngine(BaseEngine):
-    def execute(self, source_path: Path, limits: ExecutionLimits) -> ExecutionResult:
+    def execute(
+        self,
+        source_path: Path,
+        limits: ExecutionLimits,
+        input_data: str = "",
+        args: list[str] | None = None,
+    ) -> ExecutionResult:
         status = ExecutionStatus.OK
 
         try:
@@ -42,22 +54,39 @@ class MockEngine(BaseEngine):
 class NativeEngine(BaseEngine):
     """Native execution engine using Rust aestra_core PyO3 FFI bridge."""
 
-    def execute(self, source_path: Path, limits: ExecutionLimits) -> ExecutionResult:
+    def execute(
+        self,
+        source_path: Path,
+        limits: ExecutionLimits,
+        input_data: str = "",
+        args: list[str] | None = None,
+    ) -> ExecutionResult:
         try:
             import aestra_core  # type: ignore[import-not-found]
 
-            raw_stdout = aestra_core.execute_native(
+            cmd_args = args if args is not None else []
+            telemetry = aestra_core.execute_native(
                 str(source_path),
-                [],
+                cmd_args,
+                input_data,
                 limits.time_limit_ms,
                 limits.memory_limit_mb,
             )
+
+            status_str = telemetry.get("status", "INTERNAL_ERROR")
+            try:
+                status = ExecutionStatus(status_str)
+            except ValueError:
+                status = ExecutionStatus.INTERNAL_ERROR
+
             return ExecutionResult(
-                status=ExecutionStatus.OK,
-                stdout=raw_stdout,
-                exit_code=0,
-                cpu_time_ms=0.5,
-                peak_memory_bytes=1024 * 1024,
+                status=status,
+                exit_code=int(telemetry.get("exit_code", 0)),
+                cpu_time_ms=float(telemetry.get("cpu_time_ms", 0.0)),
+                peak_memory_bytes=int(telemetry.get("peak_memory_bytes", 0)),
+                stdout=str(telemetry.get("stdout", "")),
+                stderr=str(telemetry.get("stderr", "")),
+                error_message=telemetry.get("error_message"),
             )
         except ImportError:
             return ExecutionResult(
