@@ -8,14 +8,6 @@ body:
       value: |
         Thank you for filing a bug report. Please review our [Contributing Guidelines](https://github.com/Elitsuv/aestra/blob/main/contributing.md) before submitting.
 
-  - type: input
-    id: summary
-    attributes:
-      label: Bug Summary
-      description: A clear and concise headline describing the issue.
-      placeholder: "e.g. Memory limit enforcement fails on Linux cgroups when allocating contiguous 1GB arrays."
-    validations:
-      required: true
 
   - type: dropdown
     id: domain

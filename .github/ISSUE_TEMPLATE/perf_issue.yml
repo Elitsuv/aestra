@@ -8,14 +8,6 @@ body:
       value: |
         Report performance bottlenecks or measurement drift. Please review our [Contributing Guidelines](https://github.com/Elitsuv/aestra/blob/main/contributing.md).
 
-  - type: input
-    id: summary
-    attributes:
-      label: Performance Issue Title
-      description: Concise title summarizing the performance bottleneck or measurement drift.
-      placeholder: "e.g. PyO3 string conversion overhead adds 2ms latency on 10,000 rapid executions."
-    validations:
-      required: true
 
   - type: dropdown
     id: domain

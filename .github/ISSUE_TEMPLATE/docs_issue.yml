@@ -8,14 +8,6 @@ body:
       value: |
         Suggest documentation updates or improvements. Please review our [Contributing Guidelines](https://github.com/Elitsuv/aestra/blob/main/contributing.md).
 
-  - type: input
-    id: summary
-    attributes:
-      label: Documentation Issue Title
-      description: What documentation, guide, or example needs improvement?
-      placeholder: "e.g. Add PyO3 zero-cost FFI architecture diagram to README."
-    validations:
-      required: true
 
   - type: dropdown
     id: doc-target

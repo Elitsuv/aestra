@@ -8,14 +8,6 @@ body:
       value: |
         Propose a new feature or architectural improvement. Please review our [Contributing Guidelines](https://github.com/Elitsuv/aestra/blob/main/contributing.md) before submitting.
 
-  - type: input
-    id: summary
-    attributes:
-      label: Feature Title
-      description: A concise headline describing your proposed feature.
-      placeholder: "e.g. Add floating point epsilon output comparison mode to CP answer checker."
-    validations:
-      required: true
 
   - type: dropdown
     id: domain
