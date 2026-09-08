@@ -102,3 +102,76 @@ class NativeEngine(BaseEngine):
                 exit_code=1,
                 error_message=f"Native execution crash: {e}",
             )
+
+
+class SubprocessEngine(BaseEngine):
+    def execute(
+        self,
+        source_path: Path,
+        limits: ExecutionLimits,
+        input_data: str = "",
+        args: list[str] | None = None,
+    ) -> ExecutionResult:
+        import subprocess
+        import time
+
+        cmd = [str(source_path)] + (args if args is not None else [])
+        timeout_sec = limits.time_limit_ms / 1000.0
+
+        start_time = time.perf_counter()
+        try:
+            proc = subprocess.run(
+                cmd,
+                input=input_data,
+                text=True,
+                capture_output=True,
+                timeout=timeout_sec,
+                check=False,
+            )
+            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+            status = (
+                ExecutionStatus.OK
+                if proc.returncode == 0
+                else ExecutionStatus.RUNTIME_ERROR
+            )
+            return ExecutionResult(
+                status=status,
+                stdout=proc.stdout,
+                stderr=proc.stderr,
+                exit_code=proc.returncode,
+                cpu_time_ms=elapsed_ms,
+                peak_memory_bytes=0,
+            )
+        except subprocess.TimeoutExpired as e:
+            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+            stdout_str = e.stdout if isinstance(e.stdout, str) else ""
+            stderr_str = e.stderr if isinstance(e.stderr, str) else ""
+            return ExecutionResult(
+                status=ExecutionStatus.TIME_LIMIT_EXCEEDED,
+                stdout=stdout_str,
+                stderr=stderr_str,
+                exit_code=-1,
+                cpu_time_ms=elapsed_ms,
+                peak_memory_bytes=0,
+                error_message=f"Time limit exceeded ({limits.time_limit_ms}ms)",
+            )
+        except Exception as e:  # noqa: BLE001
+            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+            return ExecutionResult(
+                status=ExecutionStatus.INTERNAL_ERROR,
+                stdout="",
+                stderr=str(e),
+                exit_code=1,
+                cpu_time_ms=elapsed_ms,
+                peak_memory_bytes=0,
+                error_message=str(e),
+            )
+
+
+def get_engine() -> BaseEngine:
+    try:
+        import aestra_core  # noqa: F401
+
+        return NativeEngine()
+    except ImportError:
+        return SubprocessEngine()
