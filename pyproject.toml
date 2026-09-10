@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "A hybrid competitive programming execution sandbox."
 requires-python = ">=3.10"
 
+[project.scripts]
+aestra = "src.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "ruff",

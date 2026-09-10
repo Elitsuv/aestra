@@ -36,6 +36,9 @@ jobs:
       - name: Run Mypy Type Check
         run: mypy src/
 
+      - name: Run Test Suite
+        run: python -m tests.test
+
   rust-quality:
     name: Rust Core Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
