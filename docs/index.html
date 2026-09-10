@@ -959,14 +959,15 @@ cargo test --all                                              <span class="cm">#
     <ul>
       <li><strong>Rust POSIX sandbox</strong> with <code>fork</code>, <code>execve</code>, <code>setrlimit</code>, and <code>wait4</code> telemetry (<code>sandbox_posix.rs</code>)</li>
       <li><strong>PyO3 FFI bridge</strong> exposing <code>execute_native()</code> to Python via <code>lib.rs</code></li>
-      <li><strong>Cross-platform SubprocessEngine</strong> for Windows and macOS environments</li>
-      <li><strong>Output checker</strong> with TOKEN, EXACT, and IGNORE_WHITESPACE comparison modes</li>
-      <li><strong>ExecutionResult model</strong> with status enum, CPU time, peak memory, stdout/stderr capture</li>
-      <li><strong>Zero-dependency installers</strong> for Bash (<code>install.sh</code>) and PowerShell (<code>install.ps1</code>)</li>
-      <li><strong>CI pipeline</strong> with Ruff, Mypy, Cargo Clippy, Cargo Test, and Maturin Build</li>
-      <li><strong>Branch protection</strong> on <code>main</code> — force push blocked, deletion restricted</li>
-      <li><strong>Issue templates</strong> for bug reports and feature requests</li>
-      <li><strong>PR template</strong> with quality audit checklist</li>
+      <li><strong>Cross-platform SubprocessEngine</strong> fallback for environments without a native Rust toolchain</li>
+      <li><strong>Batch test runner</strong> with automated <code>.in</code>/<code>.out</code> testcase discovery and verdict aggregation (<code>runner.py</code>)</li>
+      <li><strong>Terminal CLI</strong> with <code>run</code> and <code>test</code> subcommands, colored badges, and microsecond telemetry (<code>cli.py</code>)</li>
+      <li><strong>Output checker</strong> with TOKEN, EXACT, and IGNORE_WHITESPACE comparison modes (<code>checker.py</code>)</li>
+      <li><strong>Domain models</strong> with immutable <code>ExecutionLimits</code> and rich <code>ExecutionResult</code> status telemetry</li>
+      <li><strong>Zero-dependency installers</strong> for Linux/macOS Bash (<code>install.sh</code>) and Windows PowerShell (<code>install.ps1</code>)</li>
+      <li><strong>Enterprise CI/CD pipeline</strong> with Ruff formatting/linting, strict Mypy types, and Rust test matrices</li>
+      <li><strong>Documentation portal</strong> hosted on GitHub Pages with 12 guides, dark mode, dynamic TOC, and live commit feed</li>
+      <li><strong>Engineering standards</strong> including branch protection, standardized PR/issue templates, and PR commenter bot</li>
     </ul>
   </div>
 
