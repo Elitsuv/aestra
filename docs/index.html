@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aestra Docs</title>
+  <meta name="description" content="Documentation for Aestra — a deterministic execution sandbox with hardware-level process isolation for competitive programming.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="../assets/aestra.png">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-left">
+    <a href="#overview" class="hdr-logo">
+      <img src="../assets/aestra.png" alt="">
+      <span>Aestra</span>
+    </a>
+    <span class="hdr-sep">/</span>
+    <span class="hdr-label">Docs</span>
+    <span class="hdr-pill">v0.1.0-beta</span>
+  </div>
+  <div class="hdr-right">
+    <a href="https://github.com/Elitsuv/aestra" target="_blank" rel="noopener noreferrer" class="hdr-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<div class="shell">
+<aside class="side">
+  <div class="sg">
+    <div class="sg-label">Getting started</div>
+    <ul>
+      <li><a href="#overview" class="sl on"><i data-lucide="book-open" stroke-width="1.8"></i>Overview</a></li>
+      <li><a href="#installation" class="sl"><i data-lucide="download" stroke-width="1.8"></i>Installation</a></li>
+      <li><a href="#safety" class="sl"><i data-lucide="shield-check" stroke-width="1.8"></i>Safety</a></li>
+      <li><a href="#usecases" class="sl"><i data-lucide="target" stroke-width="1.8"></i>Use cases</a></li>
+    </ul>
+  </div>
+  <div class="sg">
+    <div class="sg-label">Guides</div>
+    <ul>
+      <li><a href="#run" class="sl"><i data-lucide="play" stroke-width="1.8"></i>Running programs</a></li>
+      <li><a href="#test" class="sl"><i data-lucide="flask-conical" stroke-width="1.8"></i>Batch testing</a></li>
+      <li><a href="#checker" class="sl"><i data-lucide="diff" stroke-width="1.8"></i>Output comparison</a></li>
+    </ul>
+  </div>
+  <div class="sg">
+    <div class="sg-label">Reference</div>
+    <ul>
+      <li><a href="#interface" class="sl"><i data-lucide="layout" stroke-width="1.8"></i>Interface & layout</a></li>
+      <li><a href="#arch" class="sl"><i data-lucide="layers" stroke-width="1.8"></i>Architecture</a></li>
+      <li><a href="#api" class="sl"><i data-lucide="braces" stroke-width="1.8"></i>API reference</a></li>
+    </ul>
+  </div>
+  <div class="sg">
+    <div class="sg-label">Community</div>
+    <ul>
+      <li><a href="#contributing" class="sl"><i data-lucide="git-pull-request" stroke-width="1.8"></i>Contributing</a></li>
+      <li><a href="#changelog" class="sl"><i data-lucide="file-text" stroke-width="1.8"></i>Changelog</a></li>
+    </ul>
+  </div>
+</aside>
+
+<!-- Right TOC -->
+<nav class="toc" id="toc">
+  <div class="toc-label">On this page</div>
+  <ul id="toc-list"></ul>
+</nav>
+
+<main class="main">
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- OVERVIEW                                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="overview" class="pg on">
+  <div class="crumb">Getting started / <b>Overview</b></div>
+  <h1>Aestra documentation</h1>
+  <p class="lead">Aestra is a deterministic execution sandbox and testcase engine built to accurately enforce hardware constraints — CPU time limit and peak RAM limit — on untrusted binaries with microsecond precision. It is designed for competitive programming online judges, automated grading systems, and local problem testing workflows.</p>
+
+  <h2 data-toc>Why Aestra exists</h2>
+  <p>Traditional testcase runners use wall-clock timeouts and heuristic memory checks. This leads to inconsistent verdicts across machines with different CPU speeds or system loads. Aestra solves this by using POSIX kernel-level resource limits (<code>setrlimit</code>) that enforce constraints at the hardware scheduler level, making results deterministic regardless of host load.</p>
+  <p>The engine measures CPU time (user + kernel) via the <code>wait4</code> system call with sub-millisecond resolution, and reads peak RSS from kernel accounting — not by polling <code>/proc</code> or sampling memory at intervals.</p>
+
+  <h2 data-toc>Core capabilities</h2>
+  <div class="grid">
+    <div class="crd">
+      <div class="crd-icon"><i data-lucide="cpu" stroke-width="1.8"></i></div>
+      <h4>Hardware enforcement</h4>
+      <p>POSIX <code>setrlimit</code> for hard CPU and memory ceilings enforced by the Linux kernel scheduler, not userspace timers.</p>
+    </div>
+    <div class="crd">
+      <div class="crd-icon"><i data-lucide="timer" stroke-width="1.8"></i></div>
+      <h4>Microsecond telemetry</h4>
+      <p>User + kernel CPU time and peak resident set size via <code>wait4</code> with <code>rusage</code> accounting.</p>
+    </div>
+    <div class="crd">
+      <div class="crd-icon"><i data-lucide="monitor-smartphone" stroke-width="1.8"></i></div>
+      <h4>Cross-platform</h4>
+      <p>Native Rust POSIX sandbox on Linux/WSL. Automatic <code>SubprocessEngine</code> fallback on Windows and macOS.</p>
+    </div>
+    <div class="crd">
+      <div class="crd-icon"><i data-lucide="lock" stroke-width="1.8"></i></div>
+      <h4>Process isolation</h4>
+      <p>Forked child process with empty environment, capped file descriptors, and bounded pipe buffers. No network access.</p>
+    </div>
+  </div>
+
+  <h2 data-toc>Technology stack</h2>
+  <table>
+    <thead><tr><th>Layer</th><th>Technology</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Sandbox</strong></td><td>Rust + libc crate</td><td>POSIX <code>fork</code>, <code>execve</code>, <code>setrlimit</code>, <code>wait4</code></td></tr>
+      <tr><td><strong>FFI bridge</strong></td><td>PyO3 0.20</td><td>Zero-cost Rust ↔ Python interop with ABI3 stable API</td></tr>
+      <tr><td><strong>Build</strong></td><td>Maturin</td><td>Compile Rust extension and install into venv</td></tr>
+      <tr><td><strong>Frontend</strong></td><td>Python 3.10+</td><td>CLI, test runner, output checker, config</td></tr>
+      <tr><td><strong>CI</strong></td><td>GitHub Actions</td><td>Ruff, Mypy, Cargo Clippy, Cargo Test, Maturin Build</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <i data-lucide="triangle-alert" stroke-width="1.8"></i>
+    <p><strong>Pre-release.</strong> Aestra is currently in <code>v0.1.0-beta</code>. Core sandbox APIs, CLI interfaces, and telemetry models are actively evolving. Expect breaking changes before v1.0.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- INSTALLATION                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="installation" class="pg">
+  <div class="crumb">Getting started / <b>Installation</b></div>
+  <h1>Installation</h1>
+  <p class="lead">Aestra is not a PyPI package. You build it from source using Maturin, which compiles the Rust core and installs the Python package into your virtual environment in one step.</p>
+
+  <h2 data-toc>Prerequisites</h2>
+  <table>
+    <thead><tr><th>Tool</th><th>Version</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Python</strong></td><td>3.10+</td><td>Required for the Python frontend and CLI</td></tr>
+      <tr><td><strong>Rust</strong></td><td>1.75+</td><td>Required to compile the native POSIX sandbox extension</td></tr>
+      <tr><td><strong>Maturin</strong></td><td>Latest</td><td>Build tool that compiles Rust and installs the Python package</td></tr>
+    </tbody>
+  </table>
+
+  <p>If you don't have Rust installed, get it from <a href="https://rustup.rs" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">rustup.rs</a>:</p>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">bash</span>
+      <button class="cb-copy" data-target="c-rustup"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-rustup">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</code></pre>
+  </div>
+
+  <h2 data-toc>Build from source</h2>
+  <p>Clone the repository, create a virtual environment, and build the native extension:</p>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">bash</span>
+      <button class="cb-copy" data-target="c-build"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-build">git clone https://github.com/Elitsuv/aestra.git
+cd aestra
+
+python3 -m venv .venv
+source .venv/bin/activate  <span class="cm"># Windows: .venv\Scripts\activate</span>
+
+pip install maturin
+maturin develop</code></pre>
+  </div>
+
+  <p>The <code>maturin develop</code> command compiles the Rust <code>aestra_core</code> crate and installs it as a Python extension module into the active virtual environment. This takes about 30 seconds on first build and under 5 seconds on incremental rebuilds.</p>
+
+  <h2 data-toc>Optional automated installers</h2>
+  <p>For zero-friction setup without manual environment configuration, we created automated installer scripts (<code>scripts/install.sh</code> and <code>scripts/install.ps1</code>). These scripts automate dependency checks, environment isolation, and compilation in a single command:</p>
+
+  <div class="tabs">
+    <div class="tab-row">
+      <button class="tab-t on" data-tab="inst-bash">Linux / macOS (Bash)</button>
+      <button class="tab-t" data-tab="inst-win">Windows (PowerShell)</button>
+    </div>
+    <div id="inst-bash" class="tab-p on">
+      <p style="margin-bottom:8px">One-line remote installation:</p>
+      <div class="cb">
+        <div class="cb-bar">
+          <span class="cb-lang">bash</span>
+          <button class="cb-copy" data-target="c-inst-bash"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+        </div>
+        <pre><code id="c-inst-bash">curl -fsSL https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.sh | bash</code></pre>
+      </div>
+      <p style="margin-top:12px;margin-bottom:8px">Or run locally from a cloned repository:</p>
+      <div class="cb">
+        <div class="cb-bar">
+          <span class="cb-lang">bash</span>
+          <button class="cb-copy" data-target="c-inst-local-bash"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+        </div>
+        <pre><code id="c-inst-local-bash">chmod +x scripts/install.sh
+./scripts/install.sh</code></pre>
+      </div>
+      <p><strong>What the script executes:</strong></p>
+      <ul style="margin: 8px 0 16px 20px; font-size:13.5px; color:var(--t2);">
+        <li>Verifies <code>python3</code> (3.10+) is in PATH; warns if missing</li>
+        <li>Inspects kernel capabilities (Linux/WSL native POSIX hardware limits vs. Darwin fallback)</li>
+        <li>Bootstraps <code>pip</code> if missing using <code>ensurepip</code></li>
+        <li>Installs the local package or builds the latest release directly from GitHub</li>
+      </ul>
+    </div>
+    <div id="inst-win" class="tab-p">
+      <p style="margin-bottom:8px">One-line remote installation (PowerShell 5.1+ or 7+):</p>
+      <div class="cb">
+        <div class="cb-bar">
+          <span class="cb-lang">powershell</span>
+          <button class="cb-copy" data-target="c-inst-win"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+        </div>
+        <pre><code id="c-inst-win">irm https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.ps1 | iex</code></pre>
+      </div>
+      <p style="margin-top:12px;margin-bottom:8px">Or run locally from a cloned repository:</p>
+      <div class="cb">
+        <div class="cb-bar">
+          <span class="cb-lang">powershell</span>
+          <button class="cb-copy" data-target="c-inst-local-win"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+        </div>
+        <pre><code id="c-inst-local-win">powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1</code></pre>
+      </div>
+      <p><strong>What the script executes:</strong></p>
+      <ul style="margin: 8px 0 16px 20px; font-size:13.5px; color:var(--t2);">
+        <li>Locates <code>python</code> or <code>python3</code> executable and checks version compatibility</li>
+        <li>Enables Windows cross-platform <code>SubprocessEngine</code> fallback sandbox</li>
+        <li>Installs or upgrades the package in user mode with no administrative prompts</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout safe">
+    <i data-lucide="shield-check" stroke-width="1.8"></i>
+    <p><strong>Safe & non-intrusive.</strong> Both optional install scripts operate entirely in user space. They never alter your system registry, never request <code>sudo</code>/administrator rights, and make zero changes outside the project directory.</p>
+  </div>
+
+  <h2 data-toc>Verify installation</h2>
+  <p>Run this command to confirm the engine is working and see which backend is active:</p>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">python</span>
+      <button class="cb-copy" data-target="c-verify"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-verify">python3 -c "from src.engine import get_engine; e = get_engine(); print(type(e).__name__)"</code></pre>
+  </div>
+  <table>
+    <thead><tr><th>Output</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>NativeEngine</code></td><td>Rust POSIX sandbox loaded — full hardware enforcement available</td></tr>
+      <tr><td><code>SubprocessEngine</code></td><td>Fallback mode — timeouts work, kernel-level memory measurement unavailable</td></tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>Uninstall</h2>
+  <p>Delete the cloned directory and remove the virtual environment. No system files are modified:</p>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">bash</span>
+      <button class="cb-copy" data-target="c-uninstall"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-uninstall">deactivate           <span class="cm"># exit the venv</span>
+rm -rf aestra/       <span class="cm"># remove the project directory</span></code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SAFETY                                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="safety" class="pg">
+  <div class="crumb">Getting started / <b>Safety</b></div>
+  <h1>Safety and system integrity</h1>
+  <p class="lead">Aestra is designed to execute untrusted code safely. It runs entirely in user space, never requests root or administrator privileges, never modifies system files, never writes outside its own directory, and leaves no persistent background processes or services.</p>
+
+  <div class="callout safe">
+    <i data-lucide="shield-check" stroke-width="1.8"></i>
+    <p><strong>No system risk.</strong> Installing and running Aestra cannot corrupt your operating system, registry, PATH, or personal files. It behaves identically to any standard Python development tool — it lives inside a virtual environment and cleans up completely on uninstall.</p>
+  </div>
+
+  <h2 data-toc>How untrusted code is contained</h2>
+  <p>When the native POSIX sandbox executes a binary, it applies multiple layers of kernel-enforced constraints before the target program starts running. These are not heuristic — they are enforced by the Linux kernel scheduler itself.</p>
+
+  <table>
+    <thead><tr><th>Threat</th><th>Attack vector</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>CPU spin</strong></td>
+        <td><code>while(true);</code> infinite loop</td>
+        <td><code>RLIMIT_CPU</code> sends <code>SIGXCPU</code> when time limit is reached. A watchdog <code>SIGKILL</code> fires 1 second later as a hard backstop.</td>
+      </tr>
+      <tr>
+        <td><strong>RAM flood</strong></td>
+        <td><code>malloc(64GB)</code> allocation</td>
+        <td><code>RLIMIT_AS</code> causes <code>mmap</code> and <code>brk</code> to fail once the ceiling is hit. Host memory is never touched.</td>
+      </tr>
+      <tr>
+        <td><strong>Fork bomb</strong></td>
+        <td><code>fork()</code> in a loop</td>
+        <td><code>RLIMIT_NPROC</code> caps total child processes for the user.</td>
+      </tr>
+      <tr>
+        <td><strong>Disk fill</strong></td>
+        <td>50 GB stdout dump</td>
+        <td><code>RLIMIT_FSIZE</code> limits maximum file write size. Stdout is read through bounded pipe buffers (<code>output_limit_bytes</code>).</td>
+      </tr>
+      <tr>
+        <td><strong>Network exfiltration</strong></td>
+        <td>Socket open to external host</td>
+        <td>Empty environment passed to <code>execve</code>. No environment variables, no proxy configuration, no DNS resolution context.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>What Aestra does NOT do</h2>
+  <ul>
+    <li>Never requests <code>sudo</code>, <code>root</code>, or administrator privileges</li>
+    <li>Never writes outside the project directory</li>
+    <li>Never installs system-wide services, daemons, or startup scripts</li>
+    <li>Never modifies your shell profile, PATH, registry, or system configuration</li>
+    <li>Never sends telemetry, analytics, or crash reports to any server</li>
+    <li>Never opens network connections (the sandbox itself is fully offline)</li>
+  </ul>
+
+  <h2 data-toc>Subprocess engine safety</h2>
+  <p>On Windows and macOS where the native POSIX sandbox is not available, <code>SubprocessEngine</code> uses Python's <code>subprocess.run()</code> with strict <code>timeout</code> enforcement. While this does not provide kernel-level memory limits, the process is still killed after the timeout expires. No zombie processes are left behind — the watchdog ensures cleanup.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- USE CASES                                                         -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="usecases" class="pg">
+  <div class="crumb">Getting started / <b>Use cases</b></div>
+  <h1>Target use cases</h1>
+  <p class="lead">Aestra is engineered for environments where untrusted or user-submitted code must be executed with microsecond-level determinism, strict hardware boundaries, and zero risk to the host system.</p>
+
+  <h2 data-toc>Competitive programming judges</h2>
+  <p>Online judge platforms (such as Codeforces, AtCoder, CSES, or internal team training judges) require predictable time and memory accounting across thousands of heterogeneous submissions. Traditional judges rely on wall-clock measurements that fluctuate with server CPU load, causing false <em>Time Limit Exceeded</em> verdicts during traffic spikes.</p>
+  <p>Aestra solves this by delegating time limits to Linux kernel scheduler accounting:</p>
+  <ul>
+    <li><strong>Deterministic CPU time:</strong> Measures strictly <code>user_time + kernel_time</code> via the <code>wait4</code> system call with microsecond resolution. Background server operations never inflate submission runtimes.</li>
+    <li><strong>Hardware memory ceiling:</strong> Uses <code>RLIMIT_AS</code> to restrict address space. When a submission allocates beyond its quota (e.g. <code>vector&lt;int&gt; a(1e9)</code>), the allocation immediately fails without touching host swap or triggering the OS OOM killer.</li>
+    <li><strong>Sub-millisecond startup:</strong> Uses native <code>fork</code> and <code>execve</code> without the multi-hundred-millisecond latency overhead of Docker container lifecycle management.</li>
+  </ul>
+
+  <h2 data-toc>Automated academic grading</h2>
+  <p>Computer science university courses and autograding portals (such as Gradescope or automated lab submission runners) frequently run untrusted student code that may contain infinite loops, memory leaks, or accidental system calls.</p>
+  <ul>
+    <li><strong>Zero root privilege:</strong> Runs entirely in user space. Student submissions cannot modify system configuration, write outside the designated sandbox, or corrupt other processes.</li>
+    <li><strong>Fork bomb protection:</strong> Enforces <code>RLIMIT_NPROC</code> to cap child process creation, preventing malicious or accidental recursive <code>fork()</code> calls from locking the grading server.</li>
+    <li><strong>Standardized verdicts:</strong> Direct mapping to educational grading categories (<code>ACCEPTED</code>, <code>WRONG_ANSWER</code>, <code>TIME_LIMIT_EXCEEDED</code>, <code>MEMORY_LIMIT_EXCEEDED</code>, <code>RUNTIME_ERROR</code>).</li>
+  </ul>
+
+  <h2 data-toc>Local problem setting & stress testing</h2>
+  <p>Contest problem setters and competitive programmers preparing for ICPC or Codeforces rounds need to stress-test candidate solutions against edge cases before publishing:</p>
+  <ul>
+    <li><strong>Automated test discovery:</strong> Scans test suites matching <code>.in</code> with <code>.out</code> or <code>.ans</code> and executes full batches with aggregated verdicts.</li>
+    <li><strong>Diff inspector:</strong> Pinpoints exact token differences between actual program output and expected answers using <code>TOKEN</code> or <code>EXACT</code> mode.</li>
+    <li><strong>Generator stress loops:</strong> Can be scripted inside a Python loop to continuously generate random test cases, run a brute-force $O(N^2)$ solution against an optimized $O(N \log N)$ solution, and stop upon finding a counterexample.</li>
+  </ul>
+
+  <h2 data-toc>AI & LLM code evaluation</h2>
+  <p>Autonomous AI agents, coding assistants, and research benchmark suites (such as HumanEval, MBPP, or SWE-bench) generate and execute arbitrary code strings at high velocity. Running LLM-generated code directly on the host machine presents substantial risk of system pollution, rogue network sockets, or infinite execution loops.</p>
+  <ul>
+    <li><strong>Environment isolation:</strong> Unsets all host environment variables, removing API keys, credentials, and network proxy access from the executed child process.</li>
+    <li><strong>Hard backstop watchdog:</strong> If a runaway AI-generated process ignores <code>SIGXCPU</code>, a hard kernel <code>SIGKILL</code> terminates the process cleanly within 1 second.</li>
+    <li><strong>Machine-readable telemetry:</strong> The Python SDK returns structured dataclasses (<code>ExecutionResult</code>) ready for automated reward scoring and validation pipelines.</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- RUN                                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="run" class="pg">
+  <div class="crumb">Guides / <b>Running programs</b></div>
+  <h1>Running programs</h1>
+  <p class="lead">Execute a compiled binary or script under hardware-enforced CPU and memory constraints, and receive structured telemetry about the execution.</p>
+
+  <h2 data-toc>CLI usage</h2>
+  <p>The <code>aestra run</code> command executes a single binary with the specified constraints:</p>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">shell</span>
+      <button class="cb-copy" data-target="c-run"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-run">aestra run ./solution.out --time-limit 2000 --memory-limit 512</code></pre>
+  </div>
+  <p style="font-size:13px;color:var(--t3);margin-top:6px">Or invoke directly via Python module: <code>python -m src.cli run ./solution.out --time-limit 2000 --memory-limit 512</code></p>
+
+  <h3>Telemetry output</h3>
+  <p>After execution completes (or is terminated), Aestra prints a structured telemetry block:</p>
+  <div class="cb">
+    <div class="cb-bar"><span class="cb-lang">output</span></div>
+    <pre><code>[Telemetry]
+Status: TIME_LIMIT_EXCEEDED
+CPU Time: 2003ms
+Peak Memory: 12.1MB
+Exit Code: 137 (SIGKILL)</code></pre>
+  </div>
+
+  <p>The CPU time shown is <strong>user + kernel time</strong> measured by the kernel via <code>wait4</code> — not wall-clock time. This means background system load does not affect the measurement.</p>
+
+  <h2 data-toc>Available flags</h2>
+  <table>
+    <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>--time-limit</code></td><td><code>2000</code></td><td>Maximum CPU time in milliseconds. Maps to <code>RLIMIT_CPU</code> on POSIX systems.</td></tr>
+      <tr><td><code>--memory-limit</code></td><td><code>512</code></td><td>Maximum memory in megabytes. Maps to <code>RLIMIT_AS</code> on POSIX systems.</td></tr>
+      <tr><td><code>--input</code></td><td><code>""</code></td><td>String piped to the program's stdin via POSIX pipe.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>Python SDK</h2>
+  <p>Use the engine directly from Python for programmatic execution and result inspection:</p>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">python</span>
+      <button class="cb-copy" data-target="c-sdk"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-sdk"><span class="kw">from</span> pathlib <span class="kw">import</span> Path
+<span class="kw">from</span> src.config <span class="kw">import</span> ExecutionLimits
+<span class="kw">from</span> src.engine <span class="kw">import</span> get_engine
+
+engine = get_engine()
+limits = ExecutionLimits(time_limit_ms=<span class="num">2000</span>, memory_limit_mb=<span class="num">512</span>)
+result = engine.execute(Path(<span class="str">"./solution.out"</span>), limits, input_data=<span class="str">"42\n"</span>)
+
+print(result.status.value)        <span class="cm"># OK | TIME_LIMIT_EXCEEDED | ...</span>
+print(f<span class="str">"{result.cpu_time_ms:.2f} ms"</span>)
+print(f<span class="str">"{result.peak_memory_mb:.1f} MB"</span>)
+print(result.stdout)</code></pre>
+  </div>
+
+  <h2 data-toc>Execution statuses</h2>
+  <p>Every execution returns an <code>ExecutionStatus</code> enum. These map directly to competitive programming judge verdicts:</p>
+  <table>
+    <thead><tr><th>Status</th><th>Trigger</th><th>Exit code</th></tr></thead>
+    <tbody>
+      <tr><td><code>OK</code></td><td>Normal termination with exit code 0</td><td>0</td></tr>
+      <tr><td><code>TIME_LIMIT_EXCEEDED</code></td><td>CPU time exceeded limit or <code>SIGXCPU</code>/<code>SIGKILL</code></td><td>128 + signal</td></tr>
+      <tr><td><code>MEMORY_LIMIT_EXCEEDED</code></td><td><code>SIGSEGV</code> with peak memory ≥ limit</td><td>128 + 11</td></tr>
+      <tr><td><code>RUNTIME_ERROR</code></td><td>Non-zero exit or uncaught signal</td><td>Varies</td></tr>
+      <tr><td><code>OUTPUT_LIMIT_EXCEEDED</code></td><td>Stdout exceeds <code>output_limit_bytes</code></td><td>Varies</td></tr>
+      <tr><td><code>INTERNAL_ERROR</code></td><td>Sandbox infrastructure failure (pipe, fork, import)</td><td>1</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- TEST                                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="test" class="pg">
+  <div class="crumb">Guides / <b>Batch testing</b></div>
+  <h1>Batch testing</h1>
+  <p class="lead">Run a program against a full directory of test cases, automatically discover input/output pairs, and receive aggregated verdicts with per-case timing.</p>
+
+  <h2 data-toc>Basic usage</h2>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">shell</span>
+      <button class="cb-copy" data-target="c-test"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-test">aestra test ./solution.out --cases ./tests/ --mode token</code></pre>
+  </div>
+  <p style="font-size:13px;color:var(--t3);margin-top:6px">Or invoke directly via Python module: <code>python -m src.cli test ./solution.out --cases ./tests/ --mode token</code></p>
+
+  <h2 data-toc>Test case discovery</h2>
+  <p>Aestra automatically discovers paired input/output files in the test directory. It supports multiple naming conventions commonly used in competitive programming:</p>
+  <table>
+    <thead><tr><th>Input file</th><th>Expected output</th></tr></thead>
+    <tbody>
+      <tr><td><code>1.in</code></td><td><code>1.out</code> or <code>1.ans</code></td></tr>
+      <tr><td><code>test_01.in</code></td><td><code>test_01.out</code> or <code>test_01.ans</code></td></tr>
+      <tr><td><code>sample.in</code></td><td><code>sample.out</code></td></tr>
+    </tbody>
+  </table>
+  <p>Files are matched by base name — <code>foo.in</code> pairs with <code>foo.out</code> or <code>foo.ans</code>. Input files without a matching output file are skipped with a warning.</p>
+
+  <h2 data-toc>Verdicts</h2>
+  <p>Each test case produces one of the following verdicts:</p>
+  <table>
+    <thead><tr><th>Verdict</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>ACCEPTED</code></td><td>Program output matches the expected answer after applying the comparison mode</td></tr>
+      <tr><td><code>WRONG_ANSWER</code></td><td>Program ran successfully but output does not match</td></tr>
+      <tr><td><code>TIME_LIMIT_EXCEEDED</code></td><td>CPU time exceeded the configured limit</td></tr>
+      <tr><td><code>MEMORY_LIMIT_EXCEEDED</code></td><td>Memory usage exceeded the configured ceiling</td></tr>
+      <tr><td><code>RUNTIME_ERROR</code></td><td>Program crashed or returned non-zero exit code</td></tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>Comparison modes</h2>
+  <p>The <code>--mode</code> flag controls how actual output is compared against expected output. See the <a href="#checker" style="color:var(--blue)">Output comparison</a> section for detailed behavior.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CHECKER                                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="checker" class="pg">
+  <div class="crumb">Guides / <b>Output comparison</b></div>
+  <h1>Output comparison modes</h1>
+  <p class="lead">The <code>OutputChecker</code> class compares actual program output against expected answers using one of three comparison strategies. The mode you choose affects whether trailing whitespace, extra newlines, or formatting differences cause a WRONG_ANSWER verdict.</p>
+
+  <h2 data-toc>Available modes</h2>
+  <table>
+    <thead><tr><th>Mode</th><th>Behavior</th><th>Use case</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>TOKEN</code></td>
+        <td>Splits both strings by whitespace (<code>.split()</code>), then compares the resulting token sequences. Any amount of whitespace between tokens is treated identically.</td>
+        <td>Standard competitive programming problems. Ignores trailing spaces, extra newlines, and inconsistent indentation.</td>
+      </tr>
+      <tr>
+        <td><code>IGNORE_WHITESPACE</code></td>
+        <td>Strips leading and trailing whitespace from both strings (<code>.strip()</code>), then performs exact string comparison on the result.</td>
+        <td>Problems where internal formatting matters but trailing newlines should be tolerated.</td>
+      </tr>
+      <tr>
+        <td><code>EXACT</code></td>
+        <td>Byte-for-byte equality comparison. No normalization applied.</td>
+        <td>Strict output problems: formatted text, ASCII art, CSV output, or any case where whitespace is significant.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>Python usage</h2>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">python</span>
+      <button class="cb-copy" data-target="c-checker"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-checker"><span class="kw">from</span> src.checker <span class="kw">import</span> OutputChecker, CheckerMode
+
+checker = OutputChecker(CheckerMode.TOKEN)
+result = checker.check(actual=<span class="str">"42 \n"</span>, expected=<span class="str">"42"</span>)
+print(result.is_correct)  <span class="cm"># True — whitespace difference ignored in TOKEN mode</span>
+
+<span class="cm"># EXACT mode would reject this:</span>
+strict = OutputChecker(CheckerMode.EXACT)
+result = strict.check(actual=<span class="str">"42 \n"</span>, expected=<span class="str">"42"</span>)
+print(result.is_correct)  <span class="cm"># False — trailing space and newline cause mismatch</span></code></pre>
+  </div>
+
+  <h2 data-toc>CheckResult object</h2>
+  <p>The <code>check()</code> method returns a <code>CheckResult</code> dataclass:</p>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>is_correct</code></td><td><code>bool</code></td><td>Whether the output matched under the chosen mode</td></tr>
+      <tr><td><code>diff</code></td><td><code>str | None</code></td><td>A human-readable diff showing expected vs. actual (only set when incorrect)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- INTERFACE & LAYOUT                                                -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="interface" class="pg">
+  <div class="crumb">Reference / <b>Interface & layout</b></div>
+  <h1>Interface and system layout</h1>
+  <p class="lead">Aestra provides structured interfaces at every layer: a clear terminal output layout for interactive debugging, a composable Python SDK for automated pipelines, and hardware-enforced boundaries at the kernel level.</p>
+
+  <h2 data-toc>System architecture layout</h2>
+  <p>The system is organized into decoupled layers communicating across language boundaries:</p>
+
+  <div class="arch-box">┌─────────────────────────────────────────────────────────────────────────────┐
+│                            ORCHESTRATION LAYER                              │
+│                                                                             │
+│   CLI Interface (src/cli.py)          Python SDK Scripts (src/)             │
+│   aestra run | aestra test            get_engine(), ExecutionLimits        │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │
+┌───────────────────────────────────────▼─────────────────────────────────────┐
+│                            ENGINE ABSTRACTION                               │
+│                                                                             │
+│   BaseEngine (src/engine.py)                                                │
+│   ├── NativeEngine    ───► Linux / WSL (Hardware enforcement)               │
+│   └── SubprocessEngine ──► Windows / macOS (Cross-platform fallback)        │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │ (PyO3 ABI3 FFI)
+┌───────────────────────────────────────▼─────────────────────────────────────┐
+│                           RUST CORE (aestra_core)                           │
+│                                                                             │
+│   lib.rs  ────────────► PyO3 FFI bridge (execute_native)                    │
+│   sandbox_posix.rs ───► fork() ──► setrlimit() ──► execve() ──► wait4()    │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │ (POSIX System Calls)
+┌───────────────────────────────────────▼─────────────────────────────────────┐
+│                           LINUX KERNEL SUBSYSTEM                            │
+│                                                                             │
+│   RLIMIT_CPU (SIGXCPU)  │  RLIMIT_AS (Heap cap)  │  wait4 rusage telemetry  │
+└─────────────────────────────────────────────────────────────────────────────┘</div>
+
+  <h2 data-toc>Terminal CLI output layout</h2>
+  <p>When running through the command line, Aestra produces structured visual output designed for rapid terminal inspection.</p>
+
+  <h3>Single execution layout</h3>
+  <div class="cb">
+    <div class="cb-bar"><span class="cb-lang">terminal</span></div>
+    <pre><code>$ aestra run ./solution.out --time-limit 2000 --memory-limit 512
+
+[Telemetry]
+Status: OK
+CPU Time: 14.8ms
+Peak Memory: 8.4MB
+Exit Code: 0
+
+[Output]
+42</code></pre>
+  </div>
+
+  <h3>Batch test runner layout</h3>
+  <div class="cb">
+    <div class="cb-bar"><span class="cb-lang">terminal</span></div>
+    <pre><code>$ aestra test ./solution.out --cases ./tests/ --mode token
+
+Running 4 test cases on solution.out...
+Limits: 2000ms CPU, 512MB RAM | Mode: TOKEN
+
+  [ACCEPTED]               test_01.in        12.4ms    8.2MB
+  [ACCEPTED]               test_02.in        15.1ms    8.4MB
+  [TIME_LIMIT_EXCEEDED]    test_03.in      2001.2ms   12.0MB
+  [WRONG_ANSWER]           test_04.in         9.8ms    6.1MB
+      Expected:
+      42 100
+      Actual:
+      42 99
+
+Verdict: 2/4 test cases accepted.</code></pre>
+  </div>
+
+  <h2 data-toc>Verdict badge taxonomy</h2>
+  <p>Verdicts represent standardized competitive programming judge outcomes:</p>
+  <table>
+    <thead><tr><th>Verdict</th><th>Badge</th><th>Condition</th></tr></thead>
+    <tbody>
+      <tr><td>Accepted</td><td><span class="v-badge ac">ACCEPTED</span></td><td>Process exited 0 and output matched expected answer under active comparison mode</td></tr>
+      <tr><td>Wrong Answer</td><td><span class="v-badge wa">WRONG_ANSWER</span></td><td>Process exited 0 but output differed from expected answer</td></tr>
+      <tr><td>Time Limit</td><td><span class="v-badge tle">TIME_LIMIT_EXCEEDED</span></td><td>CPU time exceeded limit or terminated by <code>SIGXCPU</code> / <code>SIGKILL</code></td></tr>
+      <tr><td>Memory Limit</td><td><span class="v-badge mle">MEMORY_LIMIT_EXCEEDED</span></td><td>Process exceeded configured RAM ceiling or crashed with <code>SIGSEGV</code> under memory pressure</td></tr>
+      <tr><td>Runtime Error</td><td><span class="v-badge re">RUNTIME_ERROR</span></td><td>Process crashed with non-zero exit code or uncaught signal (e.g. <code>SIGABRT</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>Python SDK dataflow layout</h2>
+  <p>The programmatic interface follows a unidirectional dataflow pipeline:</p>
+  <div class="cb">
+    <div class="cb-bar"><span class="cb-lang">python</span></div>
+    <pre><code><span class="kw">from</span> pathlib <span class="kw">import</span> Path
+<span class="kw">from</span> src.config <span class="kw">import</span> ExecutionLimits
+<span class="kw">from</span> src.engine <span class="kw">import</span> get_engine
+<span class="kw">from</span> src.checker <span class="kw">import</span> OutputChecker, CheckerMode
+
+<span class="cm"># 1. Configure resource limits</span>
+limits = ExecutionLimits(time_limit_ms=<span class="num">1000</span>, memory_limit_mb=<span class="num">256</span>)
+
+<span class="cm"># 2. Acquire appropriate engine (NativeEngine or SubprocessEngine)</span>
+engine = get_engine()
+
+<span class="cm"># 3. Execute binary and capture telemetry</span>
+result = engine.execute(Path(<span class="str">"./solution"</span>), limits, input_data=<span class="str">"10 20\n"</span>)
+
+<span class="cm"># 4. Compare output against expected answer</span>
+checker = OutputChecker(mode=CheckerMode.TOKEN)
+check_result = checker.check(actual=result.stdout, expected=<span class="str">"30\n"</span>)
+
+print(f<span class="str">"Verdict: {'ACCEPTED' if check_result.is_correct else 'WRONG_ANSWER'}"</span>)
+print(f<span class="str">"CPU Time: {result.cpu_time_ms}ms | Peak RAM: {result.peak_memory_mb}MB"</span>)</code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- ARCHITECTURE                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="arch" class="pg">
+  <div class="crumb">Reference / <b>Architecture</b></div>
+  <h1>Architecture</h1>
+  <p class="lead">Aestra uses a two-tier execution model. The Rust core handles low-level POSIX sandboxing, while the Python frontend provides CLI orchestration, answer verification, and configuration management. The two layers communicate through a zero-cost PyO3 FFI bridge.</p>
+
+  <h2 data-toc>Tier 1 — Native POSIX sandbox</h2>
+  <p>On Linux and WSL, <code>aestra_core</code> (compiled from <code>src/sandbox_posix.rs</code>) performs the following sequence:</p>
+  <ol class="steps">
+    <li>Creates three POSIX pipes for stdin, stdout, and stderr IPC</li>
+    <li>Calls <code>fork()</code> to create a child process</li>
+    <li>In the child: applies <code>setrlimit</code> for <code>RLIMIT_CPU</code>, <code>RLIMIT_AS</code>, <code>RLIMIT_NPROC</code>, and <code>RLIMIT_FSIZE</code></li>
+    <li>Redirects file descriptors with <code>dup2</code> and calls <code>execve</code> with an empty environment</li>
+    <li>In the parent: writes input data to stdin pipe, then reads stdout and stderr through bounded buffers</li>
+    <li>Calls <code>wait4</code> to collect the exit status and <code>rusage</code> struct containing CPU time and peak RSS</li>
+    <li>Interprets the exit signal (<code>SIGXCPU</code>, <code>SIGKILL</code>, <code>SIGSEGV</code>) to determine the verdict</li>
+  </ol>
+
+  <h2 data-toc>Tier 2 — Subprocess fallback</h2>
+  <p>On Windows and macOS, or when the native extension is not compiled, <code>SubprocessEngine</code> in <code>src/engine.py</code> provides an equivalent interface using Python's <code>subprocess.run()</code>. It passes <code>timeout=</code> for time enforcement and measures wall-clock time via <code>time.perf_counter()</code>.</p>
+  <p>Limitations of the fallback engine:</p>
+  <ul>
+    <li>Memory measurement is not available (reports 0 bytes)</li>
+    <li>Wall-clock time is used instead of CPU time — affected by system load</li>
+    <li>No kernel-level process limits — the target runs with normal user permissions</li>
+  </ul>
+
+  <div class="callout info">
+    <i data-lucide="info" stroke-width="1.8"></i>
+    <p><strong>Automatic selection.</strong> The <code>get_engine()</code> factory function detects available backends at import time. It tries to <code>import aestra_core</code> and returns <code>NativeEngine</code> if successful, otherwise falls back to <code>SubprocessEngine</code>. No configuration or environment variables needed.</p>
+  </div>
+
+  <h2 data-toc>Project structure</h2>
+  <div class="cb">
+    <div class="cb-bar"><span class="cb-lang">tree</span></div>
+    <pre><code>aestra/
+├── src/
+│   ├── __init__.py          <span class="cm"># Package exports</span>
+│   ├── cli.py               <span class="cm"># CLI entrypoint (run, test commands)</span>
+│   ├── config.py            <span class="cm"># ExecutionLimits dataclass</span>
+│   ├── models.py            <span class="cm"># ExecutionResult, ExecutionStatus enum</span>
+│   ├── engine.py            <span class="cm"># BaseEngine, NativeEngine, SubprocessEngine, get_engine()</span>
+│   ├── runner.py            <span class="cm"># BatchRunner engine with testcase discovery</span>
+│   ├── checker.py           <span class="cm"># OutputChecker with TOKEN/EXACT/IGNORE_WHITESPACE</span>
+│   ├── lib.rs               <span class="cm"># PyO3 module definition — exposes execute_native()</span>
+│   └── sandbox_posix.rs     <span class="cm"># Rust POSIX sandbox: fork, setrlimit, execve, wait4</span>
+├── tests/
+│   └── test.py              <span class="cm"># Unified test suite</span>
+├── scripts/
+│   ├── install.sh           <span class="cm"># Zero-dependency Linux/macOS installer</span>
+│   └── install.ps1          <span class="cm"># PowerShell Windows installer</span>
+├── Cargo.toml               <span class="cm"># Rust crate config (PyO3, libc)</span>
+├── pyproject.toml            <span class="cm"># Python project metadata</span>
+└── .github/
+    └── workflows/ci.yml     <span class="cm"># CI: Ruff, Mypy, Clippy, Cargo Test, Maturin Build</span></code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- API REFERENCE                                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="api" class="pg">
+  <div class="crumb">Reference / <b>API reference</b></div>
+  <h1>API reference</h1>
+  <p class="lead">Complete reference for all public classes, methods, and data models in the Aestra Python SDK.</p>
+
+  <h2 data-toc>ExecutionLimits</h2>
+  <p><span class="badge python">Python</span> <code>src.config.ExecutionLimits</code></p>
+  <p>Frozen dataclass that defines resource constraints for a single execution run.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>time_limit_ms</code></td><td><code>int</code></td><td><code>2000</code></td><td>Maximum CPU time in milliseconds</td></tr>
+      <tr><td><code>memory_limit_mb</code></td><td><code>int</code></td><td><code>512</code></td><td>Maximum memory in megabytes</td></tr>
+    </tbody>
+  </table>
+  <h4>Properties</h4>
+  <table>
+    <thead><tr><th>Property</th><th>Returns</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>.time_limit</code></td><td><code>int</code></td><td>Time limit in whole seconds (floor division, minimum 1)</td></tr>
+      <tr><td><code>.memory_limit_bytes</code></td><td><code>int</code></td><td>Memory limit converted to bytes</td></tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>ExecutionResult</h2>
+  <p><span class="badge python">Python</span> <code>src.models.ExecutionResult</code></p>
+  <p>Frozen dataclass containing the outcome and telemetry from a single execution.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>status</code></td><td><code>ExecutionStatus</code></td><td>Verdict enum</td></tr>
+      <tr><td><code>exit_code</code></td><td><code>int</code></td><td>Process exit code (128 + signal if killed)</td></tr>
+      <tr><td><code>cpu_time_ms</code></td><td><code>float</code></td><td>User + kernel CPU time in milliseconds</td></tr>
+      <tr><td><code>wall_time_ms</code></td><td><code>float</code></td><td>Wall-clock time in milliseconds</td></tr>
+      <tr><td><code>peak_memory_bytes</code></td><td><code>int</code></td><td>Peak resident set size in bytes</td></tr>
+      <tr><td><code>stdout</code></td><td><code>str</code></td><td>Captured standard output</td></tr>
+      <tr><td><code>stderr</code></td><td><code>str</code></td><td>Captured standard error</td></tr>
+      <tr><td><code>error_message</code></td><td><code>str | None</code></td><td>Internal error description (if applicable)</td></tr>
+    </tbody>
+  </table>
+  <h4>Properties</h4>
+  <table>
+    <thead><tr><th>Property</th><th>Returns</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>.peak_memory_mb</code></td><td><code>float</code></td><td>Peak memory converted to megabytes</td></tr>
+      <tr><td><code>.is_success</code></td><td><code>bool</code></td><td>True if status is SUCCESS, OK, or ACCEPTED and exit code is 0</td></tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>get_engine()</h2>
+  <p><span class="badge python">Python</span> <code>src.engine.get_engine() → BaseEngine</code></p>
+  <p>Factory function that returns the best available execution engine. Attempts to import <code>aestra_core</code> and returns <code>NativeEngine</code> if available, otherwise returns <code>SubprocessEngine</code>.</p>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">python</span>
+      <button class="cb-copy" data-target="c-getengine"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-getengine"><span class="kw">from</span> src.engine <span class="kw">import</span> get_engine
+
+engine = get_engine()
+<span class="cm"># Returns NativeEngine on Linux/WSL, SubprocessEngine on Windows/macOS</span></code></pre>
+  </div>
+
+  <h2 data-toc>OutputChecker</h2>
+  <p><span class="badge python">Python</span> <code>src.checker.OutputChecker</code></p>
+  <table>
+    <thead><tr><th>Method</th><th>Arguments</th><th>Returns</th></tr></thead>
+    <tbody>
+      <tr><td><code>__init__</code></td><td><code>mode: CheckerMode = TOKEN</code></td><td>—</td></tr>
+      <tr><td><code>check</code></td><td><code>actual: str, expected: str</code></td><td><code>CheckResult</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>execute_native()</h2>
+  <p><span class="badge rust">Rust</span> <code>aestra_core.execute_native() → dict</code></p>
+  <p>Low-level Rust function exposed via PyO3. Called internally by <code>NativeEngine</code>.</p>
+  <table>
+    <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>command</code></td><td><code>str</code></td><td>Path to the executable binary</td></tr>
+      <tr><td><code>args</code></td><td><code>list[str]</code></td><td>Command-line arguments</td></tr>
+      <tr><td><code>input_data</code></td><td><code>str</code></td><td>Data piped to stdin</td></tr>
+      <tr><td><code>time_limit_ms</code></td><td><code>int</code></td><td>CPU time limit in milliseconds</td></tr>
+      <tr><td><code>memory_limit_mb</code></td><td><code>int</code></td><td>Memory limit in megabytes</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CONTRIBUTING                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="contributing" class="pg">
+  <div class="crumb">Community / <b>Contributing</b></div>
+  <h1>Contributing</h1>
+  <p class="lead">Contributions to Aestra are welcome. We maintain strict engineering standards to preserve deterministic execution and FFI boundary safety. This guide covers development setup, quality checks, pull request workflow, and project conventions.</p>
+
+  <h2 data-toc>Development setup</h2>
+  <p>You need both Rust and Python to work on the full codebase:</p>
+
+  <h3>Prerequisites</h3>
+  <table>
+    <thead><tr><th>Tool</th><th>Version</th><th>Install</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Rust</strong></td><td>1.75.0+</td><td><code>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</code></td></tr>
+      <tr><td><strong>Python</strong></td><td>3.10+</td><td><a href="https://python.org" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">python.org</a></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Environment setup</h3>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">bash</span>
+      <button class="cb-copy" data-target="c-devsetup"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-devsetup">git clone https://github.com/Elitsuv/aestra.git
+cd aestra
+
+python3 -m venv .venv
+source .venv/bin/activate  <span class="cm"># Windows: .venv\Scripts\activate</span>
+
+pip install maturin ruff mypy pytest
+maturin develop</code></pre>
+  </div>
+
+  <h2 data-toc>Quality standards</h2>
+  <p>All pull requests must pass the following checks locally before submission. The CI pipeline runs these automatically on every PR.</p>
+
+  <h3>Python linting <span class="badge python">Python</span></h3>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">bash</span>
+      <button class="cb-copy" data-target="c-pylint"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-pylint">ruff check .              <span class="cm"># Lint check</span>
+ruff format --check .     <span class="cm"># Format check</span>
+mypy src/                 <span class="cm"># Type check</span></code></pre>
+  </div>
+
+  <h3>Rust linting <span class="badge rust">Rust</span></h3>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">bash</span>
+      <button class="cb-copy" data-target="c-rustlint"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-rustlint">cargo fmt --all -- --check                                    <span class="cm"># Format check</span>
+cargo clippy --all-targets --all-features -- -D warnings      <span class="cm"># Lint check</span>
+cargo test --all                                              <span class="cm"># Unit tests</span></code></pre>
+  </div>
+
+  <h2 data-toc>Pull request lifecycle</h2>
+  <ol class="steps">
+    <li><strong>Branch naming:</strong> Use scoped branch names like <code>feat/sandbox-limits</code>, <code>fix/zombie-pid</code>, or <code>docs/api-reference</code></li>
+    <li><strong>Atomic commits:</strong> Write clear, imperative commit messages following conventional commits — e.g. <code>feat(rust-core): enforce rlimit AS</code></li>
+    <li><strong>Target main:</strong> All PRs target the <code>main</code> branch. Ensure both Python and Rust CI checks pass before requesting review.</li>
+    <li><strong>PR quality audit:</strong> The PR template includes a checklist for code quality, test coverage, and documentation updates.</li>
+  </ol>
+
+  <h2 data-toc>Label taxonomy</h2>
+  <p>Attach appropriate labels to your PR for categorization and changelog generation:</p>
+
+  <h3>Size labels</h3>
+  <table>
+    <thead><tr><th>Label</th><th>Lines changed</th></tr></thead>
+    <tbody>
+      <tr><td><code>size: xsmall</code></td><td>&lt; 10 lines</td></tr>
+      <tr><td><code>size: small</code></td><td>&lt; 50 lines</td></tr>
+      <tr><td><code>size: mid</code></td><td>&lt; 250 lines</td></tr>
+      <tr><td><code>size: large</code></td><td>&lt; 1000 lines</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Type labels</h3>
+  <table>
+    <thead><tr><th>Label</th><th>Use for</th></tr></thead>
+    <tbody>
+      <tr><td><code>type: feature</code></td><td>New functionality</td></tr>
+      <tr><td><code>type: bug</code></td><td>Bug fixes</td></tr>
+      <tr><td><code>type: perf</code></td><td>Performance improvements</td></tr>
+      <tr><td><code>type: refactor</code></td><td>Code restructuring without behavior change</td></tr>
+      <tr><td><code>type: chore</code></td><td>Build system, CI, dependency updates</td></tr>
+      <tr><td><code>type: docs</code></td><td>Documentation only</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Domain labels</h3>
+  <table>
+    <thead><tr><th>Label</th><th>Scope</th></tr></thead>
+    <tbody>
+      <tr><td><code>domain: rust-core</code></td><td>Rust engine, PyO3 FFI, POSIX sandbox</td></tr>
+      <tr><td><code>domain: python-core</code></td><td>CLI, config, checker, test runner</td></tr>
+    </tbody>
+  </table>
+
+  <h2 data-toc>CI pipeline</h2>
+  <p>The CI pipeline runs on every push to <code>main</code> and every pull request. It has two jobs:</p>
+
+  <h3>Python quality <span class="badge ci">CI</span></h3>
+  <p>Runs on <code>ubuntu-latest</code> with Python 3.11. Executes Ruff lint, Ruff format, and Mypy type checking against <code>src/</code>.</p>
+
+  <h3>Rust core build <span class="badge ci">CI</span></h3>
+  <p>Runs on both <code>ubuntu-latest</code> and <code>windows-latest</code> in a matrix. Executes <code>cargo fmt --check</code>, <code>cargo clippy -D warnings</code>, <code>cargo test</code>, and <code>maturin build --release</code> to verify the extension compiles cleanly on both platforms.</p>
+
+  <div class="callout info">
+    <i data-lucide="info" stroke-width="1.8"></i>
+    <p><strong>Branch protection.</strong> The <code>main</code> branch has protection rules enabled: force pushes are blocked and branch deletion is restricted. All CI checks must pass before merge.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CHANGELOG                                                         -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="changelog" class="pg">
+  <div class="crumb">Community / <b>Changelog</b></div>
+  <h1>Changelog</h1>
+  <p class="lead">Release notes and version history for Aestra.</p>
+
+  <div class="rel">
+    <div class="rel-head">
+      <span class="rel-tag">v0.1.0-beta</span>
+      <span class="rel-date">September 2026</span>
+    </div>
+    <p>Initial public beta release. Core sandbox and testing infrastructure.</p>
+    <ul>
+      <li><strong>Rust POSIX sandbox</strong> with <code>fork</code>, <code>execve</code>, <code>setrlimit</code>, and <code>wait4</code> telemetry (<code>sandbox_posix.rs</code>)</li>
+      <li><strong>PyO3 FFI bridge</strong> exposing <code>execute_native()</code> to Python via <code>lib.rs</code></li>
+      <li><strong>Cross-platform SubprocessEngine</strong> for Windows and macOS environments</li>
+      <li><strong>Output checker</strong> with TOKEN, EXACT, and IGNORE_WHITESPACE comparison modes</li>
+      <li><strong>ExecutionResult model</strong> with status enum, CPU time, peak memory, stdout/stderr capture</li>
+      <li><strong>Zero-dependency installers</strong> for Bash (<code>install.sh</code>) and PowerShell (<code>install.ps1</code>)</li>
+      <li><strong>CI pipeline</strong> with Ruff, Mypy, Cargo Clippy, Cargo Test, and Maturin Build</li>
+      <li><strong>Branch protection</strong> on <code>main</code> — force push blocked, deletion restricted</li>
+      <li><strong>Issue templates</strong> for bug reports and feature requests</li>
+      <li><strong>PR template</strong> with quality audit checklist</li>
+    </ul>
+  </div>
+
+  <h2 data-toc>Recent commits</h2>
+  <div id="commits"><p style="color:var(--t4);font-size:13px">Loading from GitHub…</p></div>
+</section>
+
+</main>
+</div>
+
+<script src="app.js"></script>
+<script>lucide.createIcons();</script>
+</body>
+</html>

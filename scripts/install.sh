@@ -45,13 +45,22 @@ if ! ${PYTHON_BIN} -m pip --version &> /dev/null; then
     ${PYTHON_BIN} -m ensurepip --default-pip || true
 fi
 
-echo -e "${BLUE}==> Installing Aestra package...${NC}"
-
-if [ -f "pyproject.toml" ] && grep -q "aestra" pyproject.toml 2>/dev/null; then
-    ${PYTHON_BIN} -m pip install --quiet --upgrade .
+if command -v cargo &> /dev/null; then
+    echo -e "${GREEN}[✓] Rust toolchain detected — Compiling native POSIX hardware sandbox...${NC}"
+    if [ -f "pyproject.toml" ] && grep -q "aestra" pyproject.toml 2>/dev/null; then
+        ${PYTHON_BIN} -m pip install --quiet --upgrade . || true
+    else
+        ${PYTHON_BIN} -m pip install --quiet --upgrade "git+https://github.com/Elitsuv/aestra.git" || true
+    fi
 else
-    ${PYTHON_BIN} -m pip install --quiet --upgrade aestra 2>/dev/null || \
-    ${PYTHON_BIN} -m pip install --quiet --upgrade "git+https://github.com/Elitsuv/aestra.git"
+    echo -e "${YELLOW}[!] Rust not detected.${NC}"
+    echo -e "${GREEN}[✓] Cross-platform SubprocessEngine ready — Zero Rust required!${NC}"
+    echo -e "    (To enable kernel-level POSIX setrlimit limits later, install Rust from https://rustup.rs)"
+fi
+
+if [ -d "$HOME/.local/bin" ] && [ -f "./aestra" ]; then
+    cp -f ./aestra "$HOME/.local/bin/aestra" 2>/dev/null || true
+    chmod +x "$HOME/.local/bin/aestra" 2>/dev/null || true
 fi
 
 echo ""

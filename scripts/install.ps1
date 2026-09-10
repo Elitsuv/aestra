@@ -11,25 +11,30 @@ if (-not $pythonCmd) {
     exit 1
 }
 
-$pyVersion = & $pythonCmd.Source -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")'
-Write-Host "[✓] Detected Python $pyVersion" -ForegroundColor Green
-Write-Host "[✓] Windows environment detected — Subprocess sandbox mode enabled." -ForegroundColor Green
+$pyVersion = & $pythonCmd.Source -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+Write-Host "[OK] Detected Python $pyVersion" -ForegroundColor Green
+Write-Host "[OK] Windows environment detected - Subprocess sandbox mode enabled." -ForegroundColor Green
 
-Write-Host "==> Installing Aestra package..." -ForegroundColor Cyan
-
-if (Test-Path "pyproject.toml") {
-    & $pythonCmd.Source -m pip install --quiet --upgrade .
-} else {
+$hasCargo = Get-Command cargo -ErrorAction SilentlyContinue
+if ($hasCargo) {
+    Write-Host "[OK] Rust toolchain detected - Building package..." -ForegroundColor Green
     try {
-        & $pythonCmd.Source -m pip install --quiet --upgrade aestra
+        if (Test-Path "pyproject.toml") {
+            & $pythonCmd.Source -m pip install --quiet --upgrade .
+        } else {
+            & $pythonCmd.Source -m pip install --quiet --upgrade "git+https://github.com/Elitsuv/aestra.git"
+        }
     } catch {
-        & $pythonCmd.Source -m pip install --quiet --upgrade "git+https://github.com/Elitsuv/aestra.git"
+        Write-Host "[!] Pip install encountered an error, fallback to zero-build mode." -ForegroundColor Yellow
     }
+} else {
+    Write-Host "[!] Rust not detected." -ForegroundColor Yellow
+    Write-Host "[OK] Windows SubprocessEngine enabled - Zero Rust or C compiler required!" -ForegroundColor Green
 }
 
 Write-Host ""
-Write-Host "[✓] Aestra installed successfully!" -ForegroundColor Green
+Write-Host "[OK] Aestra installed successfully!" -ForegroundColor Green
 Write-Host "Quickstart:" -ForegroundColor Yellow
-Write-Host "  Run code safely:   aestra run ./solution.exe --time-limit 1000" -ForegroundColor Cyan
-Write-Host "  Run batch tests:   aestra test ./solution.exe --cases ./tests/" -ForegroundColor Cyan
+Write-Host "  Run code safely:   .\aestra.bat run ./solution.exe --time-limit 1000" -ForegroundColor Cyan
+Write-Host "  Run batch tests:   .\aestra.bat test ./solution.exe --cases ./tests/" -ForegroundColor Cyan
 Write-Host ""

@@ -14,8 +14,21 @@ Aestra is a deterministic execution sandbox and testcase engine built to accurat
 
 ## Quickstart
 
-### Installation
-Build from source:
+📖 **[Full Documentation & Guides](https://elitsuv.github.io/aestra/)**
+
+### 1. One-Line Automated Installation (Recommended)
+
+**Linux / macOS (Bash):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.ps1 | iex
+```
+
+### 2. Manual Build From Source (Requires Rust 1.75+ & Python 3.10+)
 
 ```bash
 git clone https://github.com/Elitsuv/aestra.git
