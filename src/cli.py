@@ -9,6 +9,13 @@ from src.config import ExecutionLimits
 from src.engine import get_engine
 from src.runner import BatchRunner
 
+BANNER = """
+  +-------------------------------------------------------------+
+  |  AESTRA  *  Deterministic CP Execution Sandbox  v0.1.0-beta |
+  |  Microsecond telemetry & hardware-level resource limits     |
+  +-------------------------------------------------------------+
+"""
+
 
 def run_command(args: argparse.Namespace) -> int:
     source_path = Path(args.binary)
@@ -25,11 +32,12 @@ def run_command(args: argparse.Namespace) -> int:
     input_data = args.input if args.input is not None else ""
     result = engine.execute(source_path, limits, input_data=input_data)
 
-    print("[Telemetry]")
-    print(f"Status: {result.status.value}")
-    print(f"CPU Time: {result.cpu_time_ms:.1f}ms")
-    print(f"Peak Memory: {result.peak_memory_mb:.1f}MB")
-    print(f"Exit Code: {result.exit_code}")
+    print("\n  +-- [Telemetry] ----------------------------------------------+")
+    print(f"  |  Status     : {result.status.value:<46} |")
+    print(f"  |  CPU Time   : {f'{result.cpu_time_ms:.1f}ms':<46} |")
+    print(f"  |  Peak Memory: {f'{result.peak_memory_mb:.1f}MB':<46} |")
+    print(f"  |  Exit Code  : {result.exit_code!s:<46} |")
+    print("  +-------------------------------------------------------------+")
 
     if result.stdout:
         print("\n[Output]")
@@ -73,10 +81,13 @@ def test_command(args: argparse.Namespace) -> int:
         )
         return 1
 
-    print(f"Running {len(cases)} test cases on {source_path.name}...")
+    print("\n  +-- [Batch Runner] -------------------------------------------+")
+    print(f"  |  Binary : {source_path.name:<48} |")
+    print(f"  |  Cases  : {f'{len(cases)} testcases from {cases_dir.name}/':<48} |")
     print(
-        f"Limits: {limits.time_limit_ms}ms CPU, {limits.memory_limit_mb}MB RAM | Mode: {mode.value}\n"
+        f"  |  Limits : {f'{limits.time_limit_ms}ms CPU, {limits.memory_limit_mb}MB RAM':<48} |"
     )
+    print("  +-------------------------------------------------------------+\n")
 
     batch_res = runner.run_batch(source_path, cases_dir, limits, mode=mode)
 
@@ -89,19 +100,25 @@ def test_command(args: argparse.Namespace) -> int:
             for line in res.diff.splitlines():
                 print(f"      {line}")
 
+    summary_status = "ALL PASSED" if batch_res.passed == batch_res.total else "FAILED"
+    print("\n  =============================================================")
     print(
-        f"\nVerdict: {batch_res.passed}/{batch_res.total} test cases accepted ({batch_res.overall_verdict})."
+        f"  Summary: {batch_res.passed}/{batch_res.total} accepted ({summary_status}) "
+        f"* {batch_res.total_cpu_time_ms:.1f}ms * {batch_res.max_peak_memory_mb:.1f}MB"
     )
-    print(
-        f"Total CPU Time: {batch_res.total_cpu_time_ms:.1f}ms | Max RAM: {batch_res.max_peak_memory_mb:.1f}MB"
-    )
+    print("  =============================================================\n")
     return 0 if batch_res.passed == batch_res.total else 1
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="aestra",
-        description="Aestra — Deterministic execution sandbox for competitive programming",
+        description="Aestra - Deterministic execution sandbox for competitive programming",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  aestra run ./solution.exe --time-limit 1000 --memory-limit 256
+  aestra test ./solution.exe --cases ./testcases/ --mode token
+""",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
@@ -162,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "test":
         return test_command(args)
     else:
+        print(BANNER)
         parser.print_help()
         return 0
 
