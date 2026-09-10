@@ -4,10 +4,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from src.checker import CheckerMode, OutputChecker
+from src.checker import CheckerMode
 from src.config import ExecutionLimits
 from src.engine import get_engine
-from src.models import ExecutionStatus
 from src.runner import BatchRunner
 
 
@@ -68,23 +67,34 @@ def test_command(args: argparse.Namespace) -> int:
     runner = BatchRunner()
     cases = runner.discover_test_cases(cases_dir)
     if not cases:
-        print(f"No test cases (*.in with matching *.out/*.ans) found in '{cases_dir}'.", file=sys.stderr)
+        print(
+            f"No test cases (*.in with matching *.out/*.ans) found in '{cases_dir}'.",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Running {len(cases)} test cases on {source_path.name}...")
-    print(f"Limits: {limits.time_limit_ms}ms CPU, {limits.memory_limit_mb}MB RAM | Mode: {mode.value}\n")
+    print(
+        f"Limits: {limits.time_limit_ms}ms CPU, {limits.memory_limit_mb}MB RAM | Mode: {mode.value}\n"
+    )
 
     batch_res = runner.run_batch(source_path, cases_dir, limits, mode=mode)
 
     for res in batch_res.results:
         badge = f"[{res.verdict}]"
-        print(f"  {badge:<24} {res.case_name:<16} {res.cpu_time_ms:>6.1f}ms  {res.peak_memory_mb:>5.1f}MB")
+        print(
+            f"  {badge:<24} {res.case_name:<16} {res.cpu_time_ms:>6.1f}ms  {res.peak_memory_mb:>5.1f}MB"
+        )
         if not res.is_accepted and res.diff:
             for line in res.diff.splitlines():
                 print(f"      {line}")
 
-    print(f"\nVerdict: {batch_res.passed}/{batch_res.total} test cases accepted ({batch_res.overall_verdict}).")
-    print(f"Total CPU Time: {batch_res.total_cpu_time_ms:.1f}ms | Max RAM: {batch_res.max_peak_memory_mb:.1f}MB")
+    print(
+        f"\nVerdict: {batch_res.passed}/{batch_res.total} test cases accepted ({batch_res.overall_verdict})."
+    )
+    print(
+        f"Total CPU Time: {batch_res.total_cpu_time_ms:.1f}ms | Max RAM: {batch_res.max_peak_memory_mb:.1f}MB"
+    )
     return 0 if batch_res.passed == batch_res.total else 1
 
 
@@ -96,24 +106,54 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
     # run subcommand
-    run_parser = subparsers.add_parser("run", help="Run a binary under hardware resource limits")
+    run_parser = subparsers.add_parser(
+        "run", help="Run a binary under hardware resource limits"
+    )
     run_parser.add_argument("binary", help="Path to executable binary")
-    run_parser.add_argument("--time-limit", type=int, default=2000, help="CPU time limit in ms (default: 2000)")
-    run_parser.add_argument("--memory-limit", type=int, default=512, help="Memory limit in MB (default: 512)")
-    run_parser.add_argument("--input", type=str, default=None, help="Input string to pass via stdin")
+    run_parser.add_argument(
+        "--time-limit",
+        type=int,
+        default=2000,
+        help="CPU time limit in ms (default: 2000)",
+    )
+    run_parser.add_argument(
+        "--memory-limit",
+        type=int,
+        default=512,
+        help="Memory limit in MB (default: 512)",
+    )
+    run_parser.add_argument(
+        "--input", type=str, default=None, help="Input string to pass via stdin"
+    )
 
     # test subcommand
-    test_parser = subparsers.add_parser("test", help="Run batch test cases against a binary")
+    test_parser = subparsers.add_parser(
+        "test", help="Run batch test cases against a binary"
+    )
     test_parser.add_argument("binary", help="Path to executable binary")
-    test_parser.add_argument("--cases", required=True, help="Directory containing test cases (*.in with *.out/*.ans)")
+    test_parser.add_argument(
+        "--cases",
+        required=True,
+        help="Directory containing test cases (*.in with *.out/*.ans)",
+    )
     test_parser.add_argument(
         "--mode",
         choices=["token", "exact", "ignore_whitespace"],
         default="token",
         help="Output comparison mode (default: token)",
     )
-    test_parser.add_argument("--time-limit", type=int, default=2000, help="CPU time limit in ms (default: 2000)")
-    test_parser.add_argument("--memory-limit", type=int, default=512, help="Memory limit in MB (default: 512)")
+    test_parser.add_argument(
+        "--time-limit",
+        type=int,
+        default=2000,
+        help="CPU time limit in ms (default: 2000)",
+    )
+    test_parser.add_argument(
+        "--memory-limit",
+        type=int,
+        default=512,
+        help="Memory limit in MB (default: 512)",
+    )
 
     args = parser.parse_args(argv)
 

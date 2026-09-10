@@ -115,7 +115,9 @@ def test_runner_run_case_verdicts():
         in_file.write_text("input", encoding="utf-8")
         out_file.write_text("Simulated output.", encoding="utf-8")
 
-        case = TestCase(name="test.in", input_path=in_file, expected_output_path=out_file)
+        case = TestCase(
+            name="test.in", input_path=in_file, expected_output_path=out_file
+        )
         res_ok = runner.run_case(source_file, case, limits, checker)
         assert res_ok.verdict == "ACCEPTED"
         assert res_ok.is_accepted is True
@@ -141,7 +143,9 @@ def test_runner_batch_aggregation():
         (folder / "2.in").write_text("in2", encoding="utf-8")
         (folder / "2.out").write_text("Mismatch.", encoding="utf-8")
 
-        batch_res = runner.run_batch(source_file, folder, limits, mode=CheckerMode.TOKEN)
+        batch_res = runner.run_batch(
+            source_file, folder, limits, mode=CheckerMode.TOKEN
+        )
         assert batch_res.total == 2
         assert batch_res.passed == 1
         assert batch_res.overall_verdict == "WRONG_ANSWER"
@@ -151,7 +155,9 @@ def test_runner_batch_aggregation():
 # 4. CLI TESTS
 # =====================================================================
 def test_cli_executable():
-    exit_code = cli_main(["run", sys.executable, "--time-limit", "1000", "--memory-limit", "128"])
+    exit_code = cli_main(
+        ["run", sys.executable, "--time-limit", "1000", "--memory-limit", "128"]
+    )
     assert exit_code == 0
 
 
@@ -190,13 +196,13 @@ def run_all() -> int:
             test_func()
             print(f"  [PASS] {name}")
             passed += 1
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"  [FAIL] {name}: {e}")
             failed += 1
 
-    print(f"\n==========================================")
+    print("\n==========================================")
     print(f"Test Summary: {passed}/{len(ALL_TESTS)} passed ({failed} failed)")
-    print(f"==========================================")
+    print("==========================================")
     return 0 if failed == 0 else 1
 
 

@@ -73,7 +73,9 @@ class BatchRunner:
         with open(case.input_path, "r", encoding="utf-8", errors="replace") as f:
             input_text = f.read()
 
-        with open(case.expected_output_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(
+            case.expected_output_path, "r", encoding="utf-8", errors="replace"
+        ) as f:
             expected_output = f.read()
 
         res = self.engine.execute(source_path, limits, input_data=input_text)
@@ -135,7 +137,11 @@ class BatchRunner:
                 first_failure = res.verdict
 
         total = len(cases)
-        overall = "ACCEPTED" if (total > 0 and passed == total) else (first_failure or "NO_TESTS")
+        overall = (
+            "ACCEPTED"
+            if (total > 0 and passed == total)
+            else (first_failure or "NO_TESTS")
+        )
 
         return BatchResult(
             passed=passed,
