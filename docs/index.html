@@ -121,9 +121,9 @@
     </tbody>
   </table>
 
-  <div class="callout warn">
-    <i data-lucide="triangle-alert" stroke-width="1.8"></i>
-    <p><strong>Pre-release.</strong> Aestra is currently in <code>v0.1.0-beta</code>. Core sandbox APIs, CLI interfaces, and telemetry models are actively evolving. Expect breaking changes before v1.0.</p>
+  <div class="callout info">
+    <i data-lucide="sparkles" stroke-width="1.8"></i>
+    <p><strong>Release v0.1.1.</strong> Aestra is ready for local competitive programming testing and online judge orchestration with global PATH integration and cross-platform SubprocessEngine support.</p>
   </div>
 </section>
 
@@ -214,7 +214,7 @@ maturin develop</code></pre>
           <span class="cb-lang">powershell</span>
           <button class="cb-copy" data-target="c-inst-win"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
         </div>
-        <pre><code id="c-inst-win">irm https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.ps1 | iex</code></pre>
+        <pre><code id="c-inst-win">iex (irm https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.ps1)</code></pre>
       </div>
       <p style="margin-top:12px;margin-bottom:8px">Or run locally from a cloned repository:</p>
       <div class="cb">
@@ -226,9 +226,9 @@ maturin develop</code></pre>
       </div>
       <p><strong>What the script executes:</strong></p>
       <ul style="margin: 8px 0 16px 20px; font-size:13.5px; color:var(--t2);">
-        <li>Locates <code>python</code> or <code>python3</code> executable and checks version compatibility</li>
-        <li>Enables Windows cross-platform <code>SubprocessEngine</code> fallback sandbox</li>
-        <li>Installs or upgrades the package in user mode with no administrative prompts</li>
+        <li>Locates <code>python</code> executable (3.10+) and checks version compatibility</li>
+        <li>Installs Aestra into <code>~/.aestra</code> and exposes global <code>aestra</code> command via PATH</li>
+        <li>Enables Windows cross-platform <code>SubprocessEngine</code> fallback sandbox (zero Rust required)</li>
       </ul>
     </div>
   </div>
@@ -949,6 +949,21 @@ cargo test --all                                              <span class="cm">#
   <div class="crumb">Community / <b>Changelog</b></div>
   <h1>Changelog</h1>
   <p class="lead">Release notes and version history for Aestra.</p>
+
+  <div class="rel">
+    <div class="rel-head">
+      <span class="rel-tag">v0.1.1</span>
+      <span class="rel-date">September 2026</span>
+    </div>
+    <p>Official release: global PATH integration, native Python solution testing, and CLI visual overhaul.</p>
+    <ul>
+      <li><strong>Global Command Installation:</strong> <code>install.ps1</code> and <code>install.sh</code> install <code>aestra</code> into user PATH (Python <code>Scripts/</code> and <code>~/.local/bin</code>) for global execution from any directory.</li>
+      <li><strong>Native Python Solution Support:</strong> <code>SubprocessEngine</code> automatically executes <code>.py</code> scripts without requiring shell wrappers or pre-compilation.</li>
+      <li><strong>Modern Terminal Interface:</strong> CLI upgraded with clean boxed headers, command groupings, and formatted ASCII telemetry tables.</li>
+      <li><strong>Installer Directory Self-Healing:</strong> Automated pre-check cleans broken directory artifacts before cloning to prevent git destination conflicts.</li>
+      <li><strong>Complete CP User Guide:</strong> Hands-on guides for evaluating competitive programming solutions against <code>.in</code>/<code>.out</code> testcase suites.</li>
+    </ul>
+  </div>
 
   <div class="rel">
     <div class="rel-head">
