@@ -22,37 +22,29 @@ $pyVersion = & $pythonCmd.Source -c "import sys; print(f'{sys.version_info.major
 Write-Host "  [OK] Python $pyVersion detected" -ForegroundColor Green
 
 $installDir = Join-Path $HOME ".aestra"
-$binDir = Join-Path $installDir "bin"
-
-if (-not (Test-Path $installDir)) {
-    New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-}
-if (-not (Test-Path $binDir)) {
-    New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-}
-
-$isLocalRepo = Test-Path "pyproject.toml"
+$isLocalRepo = (Test-Path "pyproject.toml") -and (Test-Path "src")
 
 if (-not $isLocalRepo) {
-    $hasGit = Get-Command git -ErrorAction SilentlyContinue
-    if ($hasGit) {
-        if (Test-Path (Join-Path $installDir ".git")) {
-            Write-Host "  [*] Updating Aestra in $installDir..." -ForegroundColor Cyan
-            & git -C $installDir pull --quiet
-        } else {
+    if (Test-Path (Join-Path $installDir ".git")) {
+        Write-Host "  [*] Updating Aestra in $installDir..." -ForegroundColor Cyan
+        & git -C $installDir pull --quiet
+    } else {
+        if (Test-Path $installDir) {
+            Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
+        }
+        $hasGit = Get-Command git -ErrorAction SilentlyContinue
+        if ($hasGit) {
             Write-Host "  [*] Cloning Aestra repository into $installDir..." -ForegroundColor Cyan
             & git clone --depth 1 --quiet "https://github.com/Elitsuv/aestra.git" $installDir
-        }
-    } else {
-        Write-Host "  [*] Downloading Aestra archive..." -ForegroundColor Cyan
-        $zipPath = Join-Path $installDir "aestra.zip"
-        Invoke-WebRequest -Uri "https://github.com/Elitsuv/aestra/archive/refs/heads/main.zip" -OutFile $zipPath
-        Expand-Archive -Path $zipPath -DestinationPath $installDir -Force
-        Remove-Item $zipPath -Force
-        $extractedDir = Join-Path $installDir "aestra-main"
-        if (Test-Path $extractedDir) {
-            Copy-Item -Path "$extractedDir\*" -Destination $installDir -Recurse -Force
-            Remove-Item $extractedDir -Recurse -Force
+        } else {
+            Write-Host "  [*] Downloading Aestra archive..." -ForegroundColor Cyan
+            $zipPath = "$installDir.zip"
+            Invoke-WebRequest -Uri "https://github.com/Elitsuv/aestra/archive/refs/heads/main.zip" -OutFile $zipPath
+            Expand-Archive -Path $zipPath -DestinationPath $HOME -Force
+            if (Test-Path (Join-Path $HOME "aestra-main")) {
+                Rename-Item (Join-Path $HOME "aestra-main") ".aestra" -Force
+            }
+            Remove-Item $zipPath -Force
         }
     }
     $repoRoot = $installDir
@@ -60,7 +52,11 @@ if (-not $isLocalRepo) {
     $repoRoot = (Get-Location).Path
 }
 
-# Create wrapper batch file in binDir, repoRoot, and Python Scripts directory
+$binDir = Join-Path $installDir "bin"
+if (-not (Test-Path $binDir)) {
+    New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+}
+
 $batContent = "@echo off`r`nset PYTHONPATH=$repoRoot;%PYTHONPATH%`r`npython -m src.cli %*"
 Set-Content -Path (Join-Path $binDir "aestra.bat") -Value $batContent -Encoding Ascii
 Set-Content -Path (Join-Path $binDir "aestra.cmd") -Value $batContent -Encoding Ascii

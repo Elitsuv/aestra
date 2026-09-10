@@ -11,9 +11,9 @@ GRAY='\033[0;90m'
 NC='\033[0m'
 
 echo ""
-echo -e "${CYAN}  ┌─────────────────────────────────────────────────────────────┐${NC}"
-echo -e "${CYAN}  │  AESTRA  ·  Competitive Programming Execution Sandbox      │${NC}"
-echo -e "${CYAN}  └─────────────────────────────────────────────────────────────┘${NC}"
+echo -e "${CYAN}  +-------------------------------------------------------------+${NC}"
+echo -e "${CYAN}  |  AESTRA  *  Competitive Programming Execution Sandbox      |${NC}"
+echo -e "${CYAN}  +-------------------------------------------------------------+${NC}"
 echo ""
 
 PYTHON_BIN=""
@@ -32,26 +32,28 @@ echo -e "${GREEN}  [✓] Python ${PYTHON_VERSION} detected${NC}"
 
 INSTALL_DIR="$HOME/.aestra"
 BIN_DIR="$HOME/.local/bin"
-mkdir -p "$INSTALL_DIR" "$BIN_DIR"
 
-if [ -f "pyproject.toml" ] && grep -q "aestra" pyproject.toml 2>/dev/null; then
+if [ -f "pyproject.toml" ] && [ -d "src" ]; then
     REPO_ROOT="$(pwd)"
 else
-    if command -v git &> /dev/null; then
-        if [ -d "$INSTALL_DIR/.git" ]; then
-            echo -e "${CYAN}  [*] Updating Aestra in $INSTALL_DIR...${NC}"
-            git -C "$INSTALL_DIR" pull --quiet
-        else
+    if [ -d "$INSTALL_DIR/.git" ]; then
+        echo -e "${CYAN}  [*] Updating Aestra in $INSTALL_DIR...${NC}"
+        git -C "$INSTALL_DIR" pull --quiet
+    else
+        rm -rf "$INSTALL_DIR"
+        if command -v git &> /dev/null; then
             echo -e "${CYAN}  [*] Cloning Aestra repository into $INSTALL_DIR...${NC}"
             git clone --depth 1 --quiet https://github.com/Elitsuv/aestra.git "$INSTALL_DIR"
+        else
+            echo -e "${CYAN}  [*] Downloading Aestra archive...${NC}"
+            mkdir -p "$INSTALL_DIR"
+            curl -sSL https://github.com/Elitsuv/aestra/archive/refs/heads/main.tar.gz | tar -xz -C "$INSTALL_DIR" --strip-components=1
         fi
-    else
-        echo -e "${CYAN}  [*] Downloading Aestra archive...${NC}"
-        curl -sSL https://github.com/Elitsuv/aestra/archive/refs/heads/main.tar.gz | tar -xz -C "$INSTALL_DIR" --strip-components=1
     fi
     REPO_ROOT="$INSTALL_DIR"
 fi
 
+mkdir -p "$BIN_DIR"
 cat <<EOF > "$BIN_DIR/aestra"
 #!/usr/bin/env bash
 export PYTHONPATH="$REPO_ROOT:\$PYTHONPATH"
