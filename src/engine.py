@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import abc
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 from src.config import ExecutionLimits
@@ -112,10 +115,12 @@ class SubprocessEngine(BaseEngine):
         input_data: str = "",
         args: list[str] | None = None,
     ) -> ExecutionResult:
-        import subprocess
-        import time
-
-        cmd = [str(source_path)] + (args if args is not None else [])
+        if source_path.suffix == ".py":
+            cmd = [sys.executable, str(source_path)] + (
+                args if args is not None else []
+            )
+        else:
+            cmd = [str(source_path)] + (args if args is not None else [])
         timeout_sec = limits.time_limit_ms / 1000.0
 
         start_time = time.perf_counter()
