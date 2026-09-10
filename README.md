@@ -158,7 +158,7 @@ engine = get_engine()
 result = engine.execute(
     Path("./solution.py"),
     limits=ExecutionLimits(time_limit_ms=1000, memory_limit_mb=256),
-    input_data="10 20\n"
+    input_data="10 20\n",
 )
 print(f"Status: {result.status} | Time: {result.cpu_time_ms:.1f}ms")
 
@@ -168,7 +168,7 @@ batch = runner.run_batch(
     Path("./solution.py"),
     Path("./testcases"),
     limits=ExecutionLimits(time_limit_ms=2000, memory_limit_mb=512),
-    mode=CheckerMode.TOKEN
+    mode=CheckerMode.TOKEN,
 )
 print(f"Passed: {batch.passed}/{batch.total} ({batch.overall_verdict})")
 ```
