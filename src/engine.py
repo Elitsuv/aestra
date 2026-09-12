@@ -67,7 +67,7 @@ class NativeEngine(BaseEngine):
         try:
             import aestra_core
 
-            cmd_args = args if args is not None else []
+            cmd_args: list[str] = args if args is not None else []
             telemetry = aestra_core.execute_native(
                 str(source_path),
                 cmd_args,
@@ -115,12 +115,11 @@ class SubprocessEngine(BaseEngine):
         input_data: str = "",
         args: list[str] | None = None,
     ) -> ExecutionResult:
+        extra_args: list[str] = args if args is not None else []
         if source_path.suffix == ".py":
-            cmd = [sys.executable, str(source_path)] + (
-                args if args is not None else []
-            )
+            cmd = [sys.executable, str(source_path)] + extra_args
         else:
-            cmd = [str(source_path)] + (args if args is not None else [])
+            cmd = [str(source_path)] + extra_args
         timeout_sec = limits.time_limit_ms / 1000.0
 
         start_time = time.perf_counter()
