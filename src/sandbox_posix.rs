@@ -119,35 +119,73 @@ pub fn execute_posix(
         let mut stderr_buf = Vec::new();
         let mut buf = [0u8; 4096];
 
-        loop {
-            let n = libc::read(
-                stdout_pipe[0],
-                buf.as_mut_ptr() as *mut libc::c_void,
-                buf.len(),
-            );
-            if n <= 0 {
-                break;
-            }
-            if stdout_buf.len() < output_limit_bytes {
-                stdout_buf.extend_from_slice(&buf[..n as usize]);
-            }
-        }
-        libc::close(stdout_pipe[0]);
+        let wall_clock_limit = std::time::Duration::from_millis((time_limit_ms * 2).max(2000));
+        let start_time = std::time::Instant::now();
+        let mut timed_out = false;
 
-        loop {
-            let n = libc::read(
-                stderr_pipe[0],
-                buf.as_mut_ptr() as *mut libc::c_void,
-                buf.len(),
-            );
-            if n <= 0 {
+        let mut out_fd = stdout_pipe[0];
+        let mut err_fd = stderr_pipe[0];
+
+        while out_fd >= 0 || err_fd >= 0 {
+            if start_time.elapsed() > wall_clock_limit {
+                timed_out = true;
+                libc::kill(pid, libc::SIGKILL);
                 break;
             }
-            if stderr_buf.len() < output_limit_bytes {
-                stderr_buf.extend_from_slice(&buf[..n as usize]);
+
+            let mut fds: [libc::pollfd; 2] = [
+                libc::pollfd {
+                    fd: out_fd,
+                    events: libc::POLLIN,
+                    revents: 0,
+                },
+                libc::pollfd {
+                    fd: err_fd,
+                    events: libc::POLLIN,
+                    revents: 0,
+                },
+            ];
+
+            let poll_res = libc::poll(fds.as_mut_ptr(), 2, 50);
+            if poll_res < 0 {
+                let err = std::io::Error::last_os_error();
+                if err.raw_os_error() == Some(libc::EINTR) {
+                    continue;
+                }
+                break;
+            }
+
+            if out_fd >= 0 && (fds[0].revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR)) != 0 {
+                let n = libc::read(out_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len());
+                if n > 0 {
+                    if stdout_buf.len() < output_limit_bytes {
+                        stdout_buf.extend_from_slice(&buf[..n as usize]);
+                    }
+                } else {
+                    libc::close(out_fd);
+                    out_fd = -1;
+                }
+            }
+
+            if err_fd >= 0 && (fds[1].revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR)) != 0 {
+                let n = libc::read(err_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len());
+                if n > 0 {
+                    if stderr_buf.len() < output_limit_bytes {
+                        stderr_buf.extend_from_slice(&buf[..n as usize]);
+                    }
+                } else {
+                    libc::close(err_fd);
+                    err_fd = -1;
+                }
             }
         }
-        libc::close(stderr_pipe[0]);
+
+        if out_fd >= 0 {
+            libc::close(out_fd);
+        }
+        if err_fd >= 0 {
+            libc::close(err_fd);
+        }
 
         let mut status: libc::c_int = 0;
         let mut rusage: libc::rusage = std::mem::zeroed();
@@ -186,7 +224,7 @@ pub fn execute_posix(
             }
         }
 
-        if total_cpu_time_ms > (time_limit_ms as f64) {
+        if timed_out || total_cpu_time_ms > (time_limit_ms as f64) {
             status_str = "TIME_LIMIT_EXCEEDED".to_string();
         }
 
