@@ -155,7 +155,8 @@ pub fn execute_posix(
                 break;
             }
 
-            if out_fd >= 0 && (fds[0].revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR)) != 0 {
+            if out_fd >= 0 && (fds[0].revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR)) != 0
+            {
                 let n = libc::read(out_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len());
                 if n > 0 {
                     if stdout_buf.len() < output_limit_bytes {
@@ -167,7 +168,8 @@ pub fn execute_posix(
                 }
             }
 
-            if err_fd >= 0 && (fds[1].revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR)) != 0 {
+            if err_fd >= 0 && (fds[1].revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR)) != 0
+            {
                 let n = libc::read(err_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len());
                 if n > 0 {
                     if stderr_buf.len() < output_limit_bytes {
