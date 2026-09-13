@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 from src.checker import CheckerMode, OutputChecker
@@ -15,12 +16,12 @@ from src.runner import BatchRunner, TestCase
 # =====================================================================
 # 1. ENGINE TESTS
 # =====================================================================
-def test_engine_factory():
+def test_engine_factory() -> None:
     engine = get_engine()
     assert isinstance(engine, BaseEngine)
 
 
-def test_subprocess_engine_execution():
+def test_subprocess_engine_execution() -> None:
     engine = SubprocessEngine()
     limits = ExecutionLimits(time_limit_ms=2000, memory_limit_mb=128)
     res = engine.execute(
@@ -33,7 +34,7 @@ def test_subprocess_engine_execution():
     assert res.exit_code == 0
 
 
-def test_subprocess_engine_timeout():
+def test_subprocess_engine_timeout() -> None:
     engine = SubprocessEngine()
     limits = ExecutionLimits(time_limit_ms=200, memory_limit_mb=128)
     res = engine.execute(
@@ -48,14 +49,14 @@ def test_subprocess_engine_timeout():
 # =====================================================================
 # 2. OUTPUT CHECKER TESTS
 # =====================================================================
-def test_checker_token_whitespace():
+def test_checker_token_whitespace() -> None:
     checker = OutputChecker(CheckerMode.TOKEN)
     result = checker.check("1 2 3\n", "1  2  3")
     assert result.is_correct is True
     assert result.diff is None
 
 
-def test_checker_token_mismatch():
+def test_checker_token_mismatch() -> None:
     checker = OutputChecker(CheckerMode.TOKEN)
     result = checker.check("1 2 4", "1 2 3")
     assert result.is_correct is False
@@ -63,13 +64,13 @@ def test_checker_token_mismatch():
     assert "Expected:\n1 2 3" in result.diff
 
 
-def test_checker_exact_strictness():
+def test_checker_exact_strictness() -> None:
     checker = OutputChecker(CheckerMode.EXACT)
     result = checker.check("hello\n", "hello")
     assert result.is_correct is False
 
 
-def test_checker_ignore_whitespace():
+def test_checker_ignore_whitespace() -> None:
     checker = OutputChecker(CheckerMode.IGNORE_WHITESPACE)
     result = checker.check("  hello world  \n", "hello world")
     assert result.is_correct is True
@@ -78,12 +79,12 @@ def test_checker_ignore_whitespace():
 # =====================================================================
 # 3. BATCH RUNNER TESTS
 # =====================================================================
-def test_runner_empty_or_missing():
+def test_runner_empty_or_missing() -> None:
     runner = BatchRunner(engine=MockEngine())
     assert runner.discover_test_cases(Path("non_existent_dir_9999")) == []
 
 
-def test_runner_case_pairing():
+def test_runner_case_pairing() -> None:
     runner = BatchRunner(engine=MockEngine())
     with tempfile.TemporaryDirectory() as tmpdir:
         folder = Path(tmpdir)
@@ -99,7 +100,7 @@ def test_runner_case_pairing():
         assert cases[1].name == "02.in"
 
 
-def test_runner_run_case_verdicts():
+def test_runner_run_case_verdicts() -> None:
     mock_engine = MockEngine()
     runner = BatchRunner(engine=mock_engine)
     limits = ExecutionLimits(time_limit_ms=2000, memory_limit_mb=128)
@@ -128,7 +129,7 @@ def test_runner_run_case_verdicts():
         assert res_wa.is_accepted is False
 
 
-def test_runner_batch_aggregation():
+def test_runner_batch_aggregation() -> None:
     mock_engine = MockEngine()
     runner = BatchRunner(engine=mock_engine)
     limits = ExecutionLimits(time_limit_ms=1000, memory_limit_mb=128)
@@ -154,14 +155,14 @@ def test_runner_batch_aggregation():
 # =====================================================================
 # 4. CLI TESTS
 # =====================================================================
-def test_cli_executable():
+def test_cli_executable() -> None:
     exit_code = cli_main(
         ["run", sys.executable, "--time-limit", "1000", "--memory-limit", "128"]
     )
     assert exit_code == 0
 
 
-def test_cli_missing_binary():
+def test_cli_missing_binary() -> None:
     exit_code = cli_main(["run", "non_existent_binary_xyz_123.exe"])
     assert exit_code == 1
 
@@ -169,7 +170,7 @@ def test_cli_missing_binary():
 # =====================================================================
 # MAIN RUNNER
 # =====================================================================
-ALL_TESTS = [
+ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
     ("Engine Factory", test_engine_factory),
     ("Subprocess Engine Success", test_subprocess_engine_execution),
     ("Subprocess Engine Timeout", test_subprocess_engine_timeout),
