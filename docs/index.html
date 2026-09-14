@@ -123,7 +123,7 @@
 
   <div class="callout info">
     <i data-lucide="sparkles" stroke-width="1.8"></i>
-    <p><strong>Release v0.1.1.</strong> Aestra is ready for local competitive programming testing and online judge orchestration with global PATH integration and cross-platform SubprocessEngine support.</p>
+    <p><strong>Release v0.1.2.</strong> Hardened POSIX sandbox with non-blocking pipe multiplexing, active wall-clock watchdog, and real-time cross-platform peak memory tracking.</p>
   </div>
 </section>
 
@@ -949,6 +949,22 @@ cargo test --all                                              <span class="cm">#
   <div class="crumb">Community / <b>Changelog</b></div>
   <h1>Changelog</h1>
   <p class="lead">Release notes and version history for Aestra.</p>
+
+  <div class="rel">
+    <div class="rel-head">
+      <span class="rel-tag">v0.1.2</span>
+      <span class="rel-date">September 2026</span>
+    </div>
+    <p>Engine hardening release: POSIX sandbox deadlock elimination, wall-clock watchdog, and real-time cross-platform memory telemetry.</p>
+    <ul>
+      <li><strong>POSIX Pipe Buffer Deadlock Resolution:</strong> Replaced sequential blocking pipe reads with non-blocking <code>libc::poll</code> event multiplexing (<code>POLLIN | POLLHUP | POLLERR</code>) to prevent 64KB kernel buffer deadlocks when children emit verbose stderr logs.</li>
+      <li><strong>Active Wall-Clock Watchdog:</strong> Added parent-side deadline enforcement using <code>std::time::Instant</code> and <code>libc::SIGKILL</code> to prevent sleeping or deadlocked binaries from bypassing <code>RLIMIT_CPU</code> and hanging the runner.</li>
+      <li><strong>Cross-Platform Peak Memory Tracking:</strong> <code>SubprocessEngine</code> now accurately reports peak working set size on Windows via <code>K32GetProcessMemoryInfo</code> and peak child RSS on macOS/POSIX via <code>resource.getrusage(RUSAGE_CHILDREN)</code>.</li>
+      <li><strong>Strict Memory Limit Enforcement (MLE):</strong> Automatic enforcement of <code>limits.memory_limit_bytes</code> across all platforms, reliably returning <code>MEMORY_LIMIT_EXCEEDED</code> on breach.</li>
+      <li><strong>Strict Type Compliance:</strong> Added full return type annotations and <code>Callable[[], None]</code> type hints across <code>tests/test.py</code> for 100% strict Mypy compliance.</li>
+      <li><strong>Automated Release CI Pipeline:</strong> Added <code>.github/workflows/release.yml</code> to build native wheel packages via Maturin and publish official GitHub Releases on tags.</li>
+    </ul>
+  </div>
 
   <div class="rel">
     <div class="rel-head">

@@ -1,0 +1,19 @@
+changelog:
+  categories:
+    - title: "New Features"
+      labels:
+        - "type: feature"
+    - title: "Bug Fixes"
+      labels:
+        - "type: bug"
+    - title: "Refactor & Maintenance"
+      labels:
+        - "type: refactor"
+        - "type: chore"
+        - "type: perf"
+    - title: "Documentation"
+      labels:
+        - "type: docs"
+    - title: "Other Changes"
+      labels:
+        - "*"
