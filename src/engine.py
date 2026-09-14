@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import contextlib
 import subprocess
 import sys
 import time
@@ -107,6 +108,60 @@ class NativeEngine(BaseEngine):
             )
 
 
+def _measure_windows_peak_memory(proc_handle: int) -> int:
+    """Measure peak working set size of a Windows process handle in bytes."""
+    if sys.platform != "win32":
+        return 0
+    with contextlib.suppress(Exception):
+        import ctypes
+        from ctypes import wintypes
+
+        class ProcessMemoryCounters(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        pmc = ProcessMemoryCounters()
+        pmc.cb = ctypes.sizeof(ProcessMemoryCounters)
+        windll = getattr(ctypes, "windll", None)
+        if windll is not None:
+            kernel32 = getattr(windll, "kernel32", None)
+            func = (
+                getattr(kernel32, "K32GetProcessMemoryInfo", None) if kernel32 else None
+            )
+            if func is None and hasattr(windll, "psapi"):
+                func = getattr(windll.psapi, "GetProcessMemoryInfo", None)
+            if func is not None and bool(func(proc_handle, ctypes.byref(pmc), pmc.cb)):
+                return int(pmc.PeakWorkingSetSize)
+    return 0
+
+
+def _measure_posix_peak_memory() -> int:
+    """Measure peak memory of child processes on POSIX systems in bytes."""
+    if sys.platform == "win32":
+        return 0
+    with contextlib.suppress(Exception):
+        import resource
+
+        rusage_children = getattr(resource, "RUSAGE_CHILDREN", None)
+        if rusage_children is None:
+            return 0
+        usage = resource.getrusage(rusage_children)
+        if sys.platform == "darwin":
+            return int(usage.ru_maxrss)
+        return int(usage.ru_maxrss * 1024)
+    return 0
+
+
 class SubprocessEngine(BaseEngine):
     def execute(
         self,
@@ -123,43 +178,72 @@ class SubprocessEngine(BaseEngine):
         timeout_sec = limits.time_limit_ms / 1000.0
 
         start_time = time.perf_counter()
+        proc: subprocess.Popen[str] | None = None
         try:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 cmd,
-                input=input_data,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                capture_output=True,
+            )
+            proc_handle_raw = getattr(proc, "_handle", None)
+            proc_handle: int | None = (
+                int(proc_handle_raw) if proc_handle_raw is not None else None
+            )
+
+            stdout_str, stderr_str = proc.communicate(
+                input=input_data,
                 timeout=timeout_sec,
-                check=False,
             )
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+
+            peak_mem = 0
+            if sys.platform == "win32" and proc_handle is not None:
+                peak_mem = _measure_windows_peak_memory(proc_handle)
+            else:
+                peak_mem = _measure_posix_peak_memory()
+
             status = (
                 ExecutionStatus.OK
                 if proc.returncode == 0
                 else ExecutionStatus.RUNTIME_ERROR
             )
+            if limits.memory_limit_bytes > 0 and peak_mem > limits.memory_limit_bytes:
+                status = ExecutionStatus.MEMORY_LIMIT_EXCEEDED
+
             return ExecutionResult(
                 status=status,
-                stdout=proc.stdout,
-                stderr=proc.stderr,
-                exit_code=proc.returncode,
-                cpu_time_ms=elapsed_ms,
-                peak_memory_bytes=0,
-            )
-        except subprocess.TimeoutExpired as e:
-            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            stdout_str = e.stdout if isinstance(e.stdout, str) else ""
-            stderr_str = e.stderr if isinstance(e.stderr, str) else ""
-            return ExecutionResult(
-                status=ExecutionStatus.TIME_LIMIT_EXCEEDED,
                 stdout=stdout_str,
                 stderr=stderr_str,
+                exit_code=proc.returncode if proc.returncode is not None else 0,
+                cpu_time_ms=elapsed_ms,
+                peak_memory_bytes=peak_mem,
+            )
+        except subprocess.TimeoutExpired:
+            if proc is not None:
+                with contextlib.suppress(Exception):
+                    proc.kill()
+                try:
+                    out, err = proc.communicate()
+                except Exception:  # noqa: BLE001
+                    out, err = "", ""
+            else:
+                out, err = "", ""
+            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+            return ExecutionResult(
+                status=ExecutionStatus.TIME_LIMIT_EXCEEDED,
+                stdout=out or "",
+                stderr=err or "",
                 exit_code=-1,
                 cpu_time_ms=elapsed_ms,
                 peak_memory_bytes=0,
                 error_message=f"Time limit exceeded ({limits.time_limit_ms}ms)",
             )
         except Exception as e:  # noqa: BLE001
+            if proc is not None:
+                with contextlib.suppress(Exception):
+                    proc.kill()
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             return ExecutionResult(
                 status=ExecutionStatus.INTERNAL_ERROR,
