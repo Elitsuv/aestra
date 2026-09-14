@@ -1,7 +1,7 @@
 <p align="left">
   <img src="assets/aestra.png" width="70" alt="Aestra Logo" align="left" style="margin-right: 15px;">
   <strong><font size="6">Aestra</font></strong><br>
-  <a href="https://github.com/Elitsuv/aestra/releases"><img src="https://img.shields.io/badge/version-v0.1.1-blue.svg" alt="Version"></a>
+  <a href="https://github.com/Elitsuv/aestra/releases"><img src="https://img.shields.io/badge/version-v0.1.2-blue.svg" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://github.com/Elitsuv/aestra/actions/workflows/ci.yml"><img src="https://github.com/Elitsuv/aestra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://elitsuv.github.io/aestra/"><img src="https://img.shields.io/badge/docs-live-cyan.svg" alt="Docs"></a>
@@ -9,15 +9,18 @@
 
 <br><br>
 
-**Aestra** is a deterministic execution sandbox and competitive programming testing engine designed to enforce hardware-level constraints—CPU time and peak memory limits—with microsecond accuracy.
+**Aestra** is a deterministic execution sandbox and competitive programming testing engine designed to enforce hardware constraints—CPU time and peak memory limits—with microsecond accuracy.
 
-Built with a low-overhead **Rust POSIX kernel core**, a universal cross-platform fallback, an **ICPC-grade differential output checker**, and a modern **terminal CLI**.
+Built with a low-overhead **Rust POSIX kernel core**, a universal cross-platform fallback, an automated **differential output checker**, and a terminal CLI.
 
-📖 **[Read the Full Documentation & Guides](https://elitsuv.github.io/aestra/)**
+[Read the Full Documentation & Guides](https://elitsuv.github.io/aestra/)
+
+> [!WARNING]
+> **Active Development & Sandboxing Notice**: Aestra is currently in active development (`v0.1.x`). While hardware resource limits (CPU timeouts, memory bounds, and wall-clock watchdogs) are enforced, Aestra runs in user space and is designed for **local competitive programming benchmarking and testcase verification**. It should not be deployed as an uncontained multi-tenant public judge for untrusted or hostile code without additional containerized isolation (e.g., Docker, cgroups v2, or dedicated VMs).
 
 ---
 
-## ⚡ Quickstart
+## Quickstart
 
 Install Aestra globally with a single command (no admin privileges or Rust compiler required):
 
@@ -38,9 +41,9 @@ aestra --help
 
 ---
 
-## 🎯 Competitive Programming User Guide
+## Competitive Programming User Guide
 
-Aestra is built from the ground up to test competitive programming solutions (Python, C++, Rust, Go) against directories of test cases.
+Aestra is built to test competitive programming solutions (Python, C++, Rust, Go) against directories of test cases.
 
 ### 1. Write Your Solution
 
@@ -80,7 +83,7 @@ Run Aestra against your solution:
 aestra test solution.py --cases testcases/
 ```
 
-**Real Terminal Output:**
+**Terminal Output:**
 ```text
   +-- [Batch Runner] -------------------------------------------+
   |  Binary : solution.py                                       |
@@ -88,23 +91,23 @@ aestra test solution.py --cases testcases/
   |  Limits : 2000ms CPU, 512MB RAM                             |
   +-------------------------------------------------------------+
 
-  [ACCEPTED]               case1.in             55.9ms    0.0MB
-  [ACCEPTED]               case2.in             45.8ms    0.0MB
-  [ACCEPTED]               case3.in             44.3ms    0.0MB
+  [ACCEPTED]               case1.in             55.9ms    10.5MB
+  [ACCEPTED]               case2.in             45.8ms    10.5MB
+  [ACCEPTED]               case3.in             44.3ms    10.5MB
 
   =============================================================
-  Summary: 3/3 accepted (ALL PASSED) * 146.0ms * 0.0MB
+  Summary: 3/3 accepted (ALL PASSED) * 146.0ms * 10.5MB
   =============================================================
 ```
 
 ---
 
-### 4. Catching Bugs & Wrong Answers (`WA`)
+### 4. Catching Bugs & Wrong Answers (WA)
 
 If your solution produces incorrect output, Aestra immediately pinpoints the mismatch:
 
 ```text
-  [WRONG_ANSWER]           case2.in             42.1ms    0.0MB
+  [WRONG_ANSWER]           case2.in             42.1ms    10.5MB
       Expected:
       350
       Got:
@@ -113,7 +116,7 @@ If your solution produces incorrect output, Aestra immediately pinpoints the mis
 
 ---
 
-## 🔍 Single Program Execution with Live Telemetry
+## Single Program Execution with Live Telemetry
 
 To benchmark a single binary or script under strict hardware limits:
 
@@ -133,21 +136,21 @@ aestra run ./solution.exe --time-limit 1000 --memory-limit 256
 
 ---
 
-## ⚙️ Output Checker Modes
+## Output Checker Modes
 
 Configure how outputs are compared with the `--mode` flag:
 
-| Mode | Flag | Description | Parity |
+| Mode | Flag | Description | Comparison Style |
 | :--- | :--- | :--- | :--- |
-| **Token** *(default)* | `--mode token` | Compares whitespace-separated tokens. Ignores extra spaces and blank lines. | Codeforces / ICPC standard |
+| **Token** *(default)* | `--mode token` | Compares whitespace-separated tokens. Ignores extra spaces and blank lines. | Whitespace-insensitive tokens |
 | **Exact** | `--mode exact` | Strict byte-by-byte comparison including exact newlines and whitespace. | Strict diff |
-| **Ignore Whitespace** | `--mode ignore_whitespace` | Strips all leading, trailing, and redundant whitespace. | Lenient grading |
+| **Ignore Whitespace** | `--mode ignore_whitespace` | Strips all leading, trailing, and redundant whitespace. | Trimmed comparison |
 
 ---
 
-## 🐍 Python SDK
+## Python SDK
 
-You can also embed Aestra into automated contest runners or grading bots:
+You can also embed Aestra into automated test scripts or local judges:
 
 ```python
 from pathlib import Path
@@ -160,7 +163,9 @@ result = engine.execute(
     limits=ExecutionLimits(time_limit_ms=1000, memory_limit_mb=256),
     input_data="10 20\n",
 )
-print(f"Status: {result.status} | Time: {result.cpu_time_ms:.1f}ms")
+print(
+    f"Status: {result.status} | Time: {result.cpu_time_ms:.1f}ms | RAM: {result.peak_memory_mb:.1f}MB"
+)
 
 # 2. Batch testing
 runner = BatchRunner()
@@ -175,9 +180,9 @@ print(f"Passed: {batch.passed}/{batch.total} ({batch.overall_verdict})")
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
-Aestra features an **adaptive dual-engine** architecture:
+Aestra features an adaptive dual-engine architecture:
 
 ```
                       +-------------------+
@@ -190,29 +195,29 @@ Aestra features an **adaptive dual-engine** architecture:
                           |           |
             [Linux / POSIX]           [Windows / Fallback]
                           |           |
-           +--------------v--+     +--v---------------+
-           |  NativeEngine   |     | SubprocessEngine |
-           |  (Rust PyO3)    |     | (Zero-build)     |
-           +--------+--------+     +--------+---------+
-                    |                       |
-           +--------v--------+              |
-           | POSIX setrlimit |              |
-           | wait4 telemetry |     +--------v---------+
-           +--------+--------+     | Wall-clock timer |
-                    |              | Process monitor  |
-           +--------v--------+     +--------+---------+
-           | Target Binary   |              |
-           +-----------------+     +--------v---------+
+            +-------------v---+    +--v---------------+
+            |  NativeEngine   |    | SubprocessEngine |
+            |  (Rust PyO3)    |    | (Zero-build)     |
+            +--------+--------+    +--------+---------+
+                     |                      |
+            +--------v--------+             |
+            | POSIX setrlimit |             |
+            | wait4 telemetry |    +--------v---------+
+            +--------+--------+    | Wall-clock timer |
+                     |             | Process monitor  |
+            +--------v--------+    +--------+---------+
+            | Target Binary   |             |
+            +-----------------+    +--------v---------+
                                    | Target Binary    |
                                    +------------------+
 ```
 
-1. **`NativeEngine` (POSIX / Linux / macOS):** Uses low-level `fork`, `execve`, and `setrlimit` (`RLIMIT_CPU`, `RLIMIT_AS`) with microsecond `wait4` kernel telemetry.
-2. **`SubprocessEngine` (Cross-Platform / Windows):** Automatic zero-configuration fallback requiring zero Rust compiler or C toolchain installations.
+1. **`NativeEngine` (POSIX / Linux):** Low-level `fork`, `execve`, and `setrlimit` (`RLIMIT_CPU`, `RLIMIT_AS`) with microsecond `wait4` kernel telemetry.
+2. **`SubprocessEngine` (Cross-Platform / Windows):** Automatic zero-configuration fallback with Windows process memory accounting (`K32GetProcessMemoryInfo`) and POSIX child `ru_maxrss` metrics.
 
 ---
 
-## 🧪 Development & Testing
+## Development & Testing
 
 Run the complete 13-test engine suite:
 
@@ -230,6 +235,6 @@ python -m mypy src
 
 ---
 
-## 📄 License
+## License
 
 Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
