@@ -163,7 +163,9 @@ result = engine.execute(
     limits=ExecutionLimits(time_limit_ms=1000, memory_limit_mb=256),
     input_data="10 20\n",
 )
-print(f"Status: {result.status} | Time: {result.cpu_time_ms:.1f}ms | RAM: {result.peak_memory_mb:.1f}MB")
+print(
+    f"Status: {result.status} | Time: {result.cpu_time_ms:.1f}ms | RAM: {result.peak_memory_mb:.1f}MB"
+)
 
 # 2. Batch testing
 runner = BatchRunner()
