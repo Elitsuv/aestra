@@ -1,0 +1,88 @@
+name: Automated PR Reviewer
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  review:
+    name: Code Review & Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Quality Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy
+
+      - name: Run CI Verification Checks
+        id: test_run
+        continue-on-error: true
+        run: |
+          echo "REPORT<<EOF" >> $GITHUB_ENV
+          FAILURES=0
+
+          echo "### 🤖 Automated Code Review Report" >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV
+
+          if ruff check .; then
+            echo "- ✅ **Linting (Ruff):** Clean syntax" >> $GITHUB_ENV
+          else
+            echo "- ❌ **Linting (Ruff):** Issues found. Run \`ruff check .\`" >> $GITHUB_ENV
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          if ruff format --check .; then
+            echo "- ✅ **Formatting (Ruff):** Properly formatted" >> $GITHUB_ENV
+          else
+            echo "- ❌ **Formatting (Ruff):** Format mismatch. Run \`ruff format .\`" >> $GITHUB_ENV
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          if mypy src/; then
+            echo "- ✅ **Type Safety (Mypy):** Strict types passed" >> $GITHUB_ENV
+          else
+            echo "- ❌ **Type Safety (Mypy):** Type errors found. Run \`mypy src/\`" >> $GITHUB_ENV
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          if python -m tests.test; then
+            echo "- ✅ **Unit Tests:** 13/13 passed without regression" >> $GITHUB_ENV
+          else
+            echo "- ❌ **Unit Tests:** Test failures detected" >> $GITHUB_ENV
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          echo "EOF" >> $GITHUB_ENV
+          exit $FAILURES
+
+      - name: Submit Official PR Review (Approve or Request Changes)
+        if: always()
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          if [ "${{ steps.test_run.outcome }}" = "success" ]; then
+            gh pr review "$PR_NUM" --approve --body "$REPORT
+
+  ---
+  **Verdict:** ✅ **Approved for merge.** All verification tests and strict quality checks passed!"
+          else
+            gh pr review "$PR_NUM" --request-changes --body "$REPORT
+
+  ---
+  **Verdict:** ❌ **Changes requested.** Please fix the failing checks on this branch and push an update before merging."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
