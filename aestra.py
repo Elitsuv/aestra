@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from src.checker import CheckerMode, CheckResult, OutputChecker
 from src.config import Config, ExecutionLimits
 from src.engine import (

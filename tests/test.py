@@ -168,6 +168,139 @@ def test_cli_missing_binary() -> None:
 
 
 # =====================================================================
+# 5. SDK TESTS
+# =====================================================================
+def test_sdk_imports_and_exports() -> None:
+    from aestra import Config, Fuzzer, FuzzResult, Judge, Minimizer
+
+    assert Judge is not None
+    assert Fuzzer is not None
+    assert Minimizer is not None
+    assert Config is not None
+    assert FuzzResult is not None
+
+
+def test_sdk_config_toml() -> None:
+    from aestra import Config
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        toml_file = Path(tmpdir) / "aestra.toml"
+        toml_file.write_text(
+            """
+[limits]
+time_limit_ms = 1500
+memory_limit_mb = 256
+output_limit_bytes = 1048576
+
+[checker]
+mode = "EXACT"
+            """,
+            encoding="utf-8",
+        )
+        cfg = Config.from_toml(toml_file)
+        assert cfg.time_limit_ms == 1500
+        assert cfg.memory_limit_mb == 256
+        assert cfg.checker_mode == CheckerMode.EXACT
+        limits = cfg.to_limits()
+        assert limits.time_limit_ms == 1500
+        assert limits.memory_limit_mb == 256
+
+
+def test_sdk_judge_single() -> None:
+    from aestra import Config, Judge
+
+    judge = Judge(
+        config=Config(time_limit_ms=2000, memory_limit_mb=128),
+        engine=SubprocessEngine(),
+    )
+    res = judge.run_single(sys.executable, args=["-c", "print('sdk_ok')"])
+    assert res.status == ExecutionStatus.OK
+    assert "sdk_ok" in res.stdout
+
+
+def test_sdk_judge_batch() -> None:
+    from aestra import Judge
+
+    mock_engine = MockEngine()
+    judge = Judge(engine=mock_engine)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        folder = Path(tmpdir)
+        source_file = folder / "solution.py"
+        source_file.write_text("# STATUS: OK\n", encoding="utf-8")
+
+        (folder / "01.in").write_text("in", encoding="utf-8")
+        (folder / "01.out").write_text("Simulated output.", encoding="utf-8")
+
+        batch_res = judge.run(source_file, cases_dir=folder)
+        assert batch_res.passed == 1
+        assert batch_res.overall_verdict == "ACCEPTED"
+
+        case = TestCase("custom.in", folder / "01.in", folder / "01.out")
+        res_list = judge.run(source_file, test_cases=[case])
+        assert res_list.passed == 1
+        assert res_list.overall_verdict == "ACCEPTED"
+
+
+def test_sdk_fuzzer_clean() -> None:
+    from aestra import Fuzzer
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sol = Path(tmpdir) / "sol.py"
+        sol.write_text("# STATUS: OK\n", encoding="utf-8")
+
+        mock_engine = MockEngine()
+        fuzzer = Fuzzer(
+            target_binary=sol,
+            oracle=lambda inp: "Simulated output.",
+            engine=mock_engine,
+        )
+        result = fuzzer.run(iterations=5)
+        assert result.found_bug is False
+        assert result.iterations_run == 5
+
+
+def test_sdk_fuzzer_catches_bug() -> None:
+    from aestra import Fuzzer
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sol = Path(tmpdir) / "sol.py"
+        sol.write_text("# STATUS: OK\n", encoding="utf-8")
+
+        mock_engine = MockEngine()
+        fuzzer = Fuzzer(
+            target_binary=sol,
+            oracle=lambda inp: "Expected something else",
+            engine=mock_engine,
+        )
+        result = fuzzer.run(iterations=5)
+        assert result.found_bug is True
+        assert result.iterations_run == 1
+        assert result.failing_input is not None
+        assert "Wrong Answer" in (result.error_message or "")
+
+
+def test_sdk_minimizer() -> None:
+    from aestra import Minimizer
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sol = Path(tmpdir) / "sol.py"
+        sol.write_text("# STATUS: OK\n", encoding="utf-8")
+
+        mock_engine = MockEngine()
+        minimizer = Minimizer(
+            target_binary=sol,
+            oracle=lambda inp: "Simulated output." if "FAIL" not in inp else "MISMATCH",
+            engine=mock_engine,
+        )
+
+        failing_input = "line1\nline2\nFAIL\nline3\nline4\n"
+        minimized = minimizer.minimize(failing_input)
+        assert "FAIL" in minimized
+        assert len(minimized.splitlines()) < len(failing_input.splitlines())
+
+
+# =====================================================================
 # MAIN RUNNER
 # =====================================================================
 ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
@@ -184,6 +317,13 @@ ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
     ("Runner Batch Aggregation", test_runner_batch_aggregation),
     ("CLI Executable Run", test_cli_executable),
     ("CLI Missing Binary Handling", test_cli_missing_binary),
+    ("SDK Imports and Exports", test_sdk_imports_and_exports),
+    ("SDK Config TOML Parsing", test_sdk_config_toml),
+    ("SDK Judge Single Execution", test_sdk_judge_single),
+    ("SDK Judge Batch Execution", test_sdk_judge_batch),
+    ("SDK Fuzzer Clean Run", test_sdk_fuzzer_clean),
+    ("SDK Fuzzer Catches Bug", test_sdk_fuzzer_catches_bug),
+    ("SDK Minimizer Delta Debugging", test_sdk_minimizer),
 ]
 
 
