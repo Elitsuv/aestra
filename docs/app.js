@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   tabs();
   copy();
   commits();
+  mobileMenu();
 });
 
 /* ═══ ROUTING ═══ */
@@ -153,3 +154,46 @@ async function commits() {
     el.innerHTML = `<p style="color:var(--t4);font-size:13px">See <a href="https://github.com/Elitsuv/aestra/commits" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">commits on GitHub</a>.</p>`;
   }
 }
+
+/* ═══ MOBILE MENU ═══ */
+function mobileMenu() {
+  const btn = document.getElementById('menu-btn');
+  const side = document.querySelector('.side');
+  const backdrop = document.getElementById('side-backdrop');
+  if (!btn || !side || !backdrop) return;
+
+  function closeMenu() {
+    side.classList.remove('open');
+    backdrop.classList.remove('open');
+    btn.innerHTML = '<i data-lucide="menu" stroke-width="2"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
+  }
+
+  function toggleMenu() {
+    const isOpen = side.classList.toggle('open');
+    backdrop.classList.toggle('open', isOpen);
+    btn.innerHTML = isOpen
+      ? '<i data-lucide="x" stroke-width="2"></i>'
+      : '<i data-lucide="menu" stroke-width="2"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
+  }
+
+  btn.addEventListener('click', toggleMenu);
+  backdrop.addEventListener('click', closeMenu);
+
+  document.querySelectorAll('.sl').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= 800) {
+        closeMenu();
+      }
+    });
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && side.classList.contains('open')) {
+      closeMenu();
+    }
+  });
+}
+
+

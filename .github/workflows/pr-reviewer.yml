@@ -35,7 +35,7 @@ jobs:
           echo "REPORT<<EOF" >> $GITHUB_ENV
           FAILURES=0
 
-          echo "### 🤖 Automated Code Review Report" >> $GITHUB_ENV
+          echo "### Code Review Report" >> $GITHUB_ENV
           echo "" >> $GITHUB_ENV
 
           if ruff check .; then
