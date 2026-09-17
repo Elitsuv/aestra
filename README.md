@@ -16,7 +16,7 @@ Built with a low-overhead **Rust POSIX kernel core**, a universal cross-platform
 [Read the Full Documentation & Guides](https://elitsuv.github.io/aestra/)
 
 > [!WARNING]
-> **Active Development & Sandboxing Notice**: Aestra is currently in active development (`v0.1.x`). While hardware resource limits (CPU timeouts, memory bounds, and wall-clock watchdogs) are enforced, Aestra runs in user space and is designed for **local competitive programming benchmarking and testcase verification**. It should not be deployed as an uncontained multi-tenant public judge for untrusted or hostile code without additional containerized isolation (e.g., Docker, cgroups v2, or dedicated VMs).
+> **Active Development & Sandboxing Notice**: Aestra is currently in active development (`v0.1.x`). While hardware resource limits (CPU timeouts, memory bounds, and wall-clock watchdogs) are enforced, Aestra runs in user space and is designed for **local competitive programming benchmarking and testcase verification**. It should not be deployed as an uncontained multi-tenant public judge for untrusted or hostile code without additional containerized isolation (e.g Docker, cgroups v2, or dedicated VMs).
 
 ---
 
