@@ -159,15 +159,32 @@ class Fuzzer:
         self.engine = engine if engine is not None else get_engine()
         self.checker = OutputChecker(mode=self.config.checker_mode)
 
-    def _run_oracle(self, input_data: str) -> str:
+    def _run_oracle(self, input_data: str) -> tuple[str, bool, str | None]:
         if callable(self.oracle):
-            return self.oracle(input_data)
+            try:
+                out = self.oracle(input_data)
+                return str(out), True, None
+            except Exception as e:  # noqa: BLE001
+                return (
+                    "",
+                    False,
+                    f"Oracle callable raised {type(e).__name__}: {e}",
+                )
+
         if isinstance(self.oracle, (str, Path)):
             oracle_path = Path(self.oracle)
             limits = self.config.to_limits()
             res = self.engine.execute(oracle_path, limits, input_data=input_data)
-            return res.stdout
-        return ""
+            if res.status != ExecutionStatus.OK:
+                err_detail = res.error_message or res.stderr or ""
+                return (
+                    "",
+                    False,
+                    f"Oracle binary failed with status {res.status.value}: {err_detail}".strip(),
+                )
+            return res.stdout, True, None
+
+        return "", True, None
 
     def run(self, iterations: int = 100) -> FuzzResult:
         """Runs fuzz iterations until a bug is found or all iterations pass."""
@@ -191,7 +208,15 @@ class Fuzzer:
 
             # Check 2: Oracle comparison if oracle provided
             if self.oracle is not None:
-                oracle_out = self._run_oracle(test_input)
+                oracle_out, oracle_ok, oracle_err = self._run_oracle(test_input)
+                if not oracle_ok:
+                    return FuzzResult(
+                        found_bug=False,
+                        iterations_run=i + 1,
+                        failing_input=test_input,
+                        error_message=f"Oracle evaluation failure: {oracle_err}",
+                    )
+
                 check_res = self.checker.check(target_res.stdout, oracle_out)
                 if not check_res.is_correct:
                     return FuzzResult(
@@ -232,12 +257,18 @@ class Minimizer:
             return True
 
         if self.oracle is not None:
+            oracle_out: str = ""
             if callable(self.oracle):
-                oracle_out = self.oracle(input_data)
+                try:
+                    oracle_out = str(self.oracle(input_data))
+                except Exception:  # noqa: BLE001
+                    return False
             else:
                 oracle_res = self.engine.execute(
                     Path(self.oracle), limits, input_data=input_data
                 )
+                if oracle_res.status != ExecutionStatus.OK:
+                    return False
                 oracle_out = oracle_res.stdout
 
             check_res = self.checker.check(res.stdout, oracle_out)
@@ -246,35 +277,87 @@ class Minimizer:
 
         return False
 
-    def minimize(self, failing_input: str) -> str:
-        """Minimizes failing_input while preserving failure."""
+    def _ddmin_units(
+        self,
+        units: list[str],
+        joiner: str,
+        steps_remaining: list[int],
+    ) -> list[str]:
+        """Hierarchical delta debugging on discrete units (lines or tokens)."""
+        if len(units) <= 1 or steps_remaining[0] <= 0:
+            return units
+
+        granularity = 2
+        while len(units) >= 2 and granularity <= len(units) and steps_remaining[0] > 0:
+            chunk_size = max(1, len(units) // granularity)
+            chunks: list[list[str]] = []
+            for i in range(0, len(units), chunk_size):
+                chunks.append(units[i : i + chunk_size])
+
+            reduced = False
+
+            # Phase A: Test complements (drop each chunk)
+            for i in range(len(chunks)):
+                if steps_remaining[0] <= 0:
+                    break
+                steps_remaining[0] -= 1
+
+                complement: list[str] = []
+                for j, ch in enumerate(chunks):
+                    if j != i:
+                        complement.extend(ch)
+
+                candidate_str = joiner.join(complement)
+                if candidate_str and self._is_failing(candidate_str):
+                    units = complement
+                    granularity = max(granularity - 1, 2)
+                    reduced = True
+                    break
+
+            if reduced:
+                continue
+
+            # Phase B: Test subsets (keep only chunk i if granularity > 2)
+            if granularity > 2:
+                for chunk in chunks:
+                    if steps_remaining[0] <= 0:
+                        break
+                    steps_remaining[0] -= 1
+
+                    candidate_str = joiner.join(chunk)
+                    if candidate_str and self._is_failing(candidate_str):
+                        units = chunk
+                        granularity = 2
+                        reduced = True
+                        break
+
+            if reduced:
+                continue
+
+            if granularity == len(units):
+                break
+            granularity = min(granularity * 2, len(units))
+
+        return units
+
+    def minimize(self, failing_input: str, max_steps: int = 200) -> str:
+        """Minimizes failing_input while preserving failure using hierarchical delta debugging."""
         if not self._is_failing(failing_input):
             return failing_input
 
+        steps_remaining = [max_steps]
         current = failing_input
 
+        # Phase 1: Line-level hierarchical delta debugging
         lines = current.splitlines(keepends=True)
-        if len(lines) > 1:
-            idx = 0
-            while idx < len(lines):
-                candidate_lines = lines[:idx] + lines[idx + 1 :]
-                candidate_input = "".join(candidate_lines)
-                if candidate_input and self._is_failing(candidate_input):
-                    lines = candidate_lines
-                else:
-                    idx += 1
+        if len(lines) > 1 and steps_remaining[0] > 0:
+            lines = self._ddmin_units(lines, "", steps_remaining)
             current = "".join(lines)
 
+        # Phase 2: Token-level hierarchical delta debugging
         tokens = current.split()
-        if len(tokens) > 1:
-            idx = 0
-            while idx < len(tokens):
-                candidate_tokens = tokens[:idx] + tokens[idx + 1 :]
-                candidate_input = " ".join(candidate_tokens)
-                if candidate_input and self._is_failing(candidate_input):
-                    tokens = candidate_tokens
-                else:
-                    idx += 1
+        if len(tokens) > 1 and steps_remaining[0] > 0:
+            tokens = self._ddmin_units(tokens, " ", steps_remaining)
             current = " ".join(tokens)
 
         return current

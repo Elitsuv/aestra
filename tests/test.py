@@ -300,6 +300,69 @@ def test_sdk_minimizer() -> None:
         assert len(minimized.splitlines()) < len(failing_input.splitlines())
 
 
+def test_safety_output_limit_exceeded() -> None:
+    engine = SubprocessEngine()
+    limits = ExecutionLimits(
+        time_limit_ms=2000, memory_limit_mb=128, output_limit_bytes=40
+    )
+    res = engine.execute(
+        Path(sys.executable),
+        limits,
+        args=["-c", "import sys; sys.stdout.write('A' * 200)"],
+    )
+    assert res.status == ExecutionStatus.OUTPUT_LIMIT_EXCEEDED
+    assert "[TRUNCATED - OUTPUT LIMIT EXCEEDED]" in res.stdout
+    assert len(res.stdout) < 200
+
+
+def test_safety_fuzzer_oracle_crash_isolation() -> None:
+    from aestra import Fuzzer
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sol = Path(tmpdir) / "sol.py"
+        sol.write_text("# STATUS: OK\n", encoding="utf-8")
+
+        mock_engine = MockEngine()
+
+        def buggy_oracle(inp: str) -> str:
+            raise ValueError("Simulated oracle crash")
+
+        fuzzer = Fuzzer(
+            target_binary=sol,
+            oracle=buggy_oracle,
+            engine=mock_engine,
+        )
+        result = fuzzer.run(iterations=5)
+        assert result.found_bug is False
+        assert result.error_message is not None
+        assert "Oracle evaluation failure" in result.error_message
+
+
+def test_safety_minimizer_hierarchical_ddmin() -> None:
+    from aestra import Minimizer
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sol = Path(tmpdir) / "sol.py"
+        sol.write_text("# STATUS: OK\n", encoding="utf-8")
+
+        mock_engine = MockEngine()
+        minimizer = Minimizer(
+            target_binary=sol,
+            oracle=lambda inp: (
+                "Simulated output." if "CRASH_TRIGGER" not in inp else "MISMATCH"
+            ),
+            engine=mock_engine,
+        )
+
+        lines = [f"noise_line_{i}" for i in range(50)]
+        lines[25] = "CRASH_TRIGGER"
+        failing_input = "\n".join(lines) + "\n"
+
+        minimized = minimizer.minimize(failing_input, max_steps=100)
+        assert "CRASH_TRIGGER" in minimized
+        assert len(minimized.splitlines()) == 1
+
+
 # =====================================================================
 # MAIN RUNNER
 # =====================================================================
@@ -324,6 +387,15 @@ ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
     ("SDK Fuzzer Clean Run", test_sdk_fuzzer_clean),
     ("SDK Fuzzer Catches Bug", test_sdk_fuzzer_catches_bug),
     ("SDK Minimizer Delta Debugging", test_sdk_minimizer),
+    ("Safety Output Limit Exceeded", test_safety_output_limit_exceeded),
+    (
+        "Safety Fuzzer Oracle Crash Isolation",
+        test_safety_fuzzer_oracle_crash_isolation,
+    ),
+    (
+        "Safety Minimizer Hierarchical DDmin",
+        test_safety_minimizer_hierarchical_ddmin,
+    ),
 ]
 
 

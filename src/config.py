@@ -11,6 +11,7 @@ from src.checker import CheckerMode
 class ExecutionLimits:
     time_limit_ms: int = 2000
     memory_limit_mb: int = 512
+    output_limit_bytes: int = 10 * 1024 * 1024
 
     @property
     def time_limit(self) -> int:
@@ -32,6 +33,7 @@ class Config:
         return ExecutionLimits(
             time_limit_ms=self.time_limit_ms,
             memory_limit_mb=self.memory_limit_mb,
+            output_limit_bytes=self.output_limit_bytes,
         )
 
     @classmethod

@@ -83,14 +83,41 @@ class NativeEngine(BaseEngine):
             except ValueError:
                 status = ExecutionStatus.INTERNAL_ERROR
 
+            stdout_str = str(telemetry.get("stdout", ""))
+            stderr_str = str(telemetry.get("stderr", ""))
+            err_msg = telemetry.get("error_message")
+
+            if limits.output_limit_bytes > 0:
+                stdout_b = stdout_str.encode("utf-8", errors="replace")
+                if len(stdout_b) > limits.output_limit_bytes:
+                    status = ExecutionStatus.OUTPUT_LIMIT_EXCEEDED
+                    err_msg = (
+                        f"Output limit exceeded ({limits.output_limit_bytes} bytes)"
+                    )
+                    stdout_str = (
+                        stdout_b[: limits.output_limit_bytes].decode(
+                            "utf-8", errors="ignore"
+                        )
+                        + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
+                    )
+
+                stderr_b = stderr_str.encode("utf-8", errors="replace")
+                if len(stderr_b) > limits.output_limit_bytes:
+                    stderr_str = (
+                        stderr_b[: limits.output_limit_bytes].decode(
+                            "utf-8", errors="ignore"
+                        )
+                        + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
+                    )
+
             return ExecutionResult(
                 status=status,
                 exit_code=int(telemetry.get("exit_code", 0)),
                 cpu_time_ms=float(telemetry.get("cpu_time_ms", 0.0)),
                 peak_memory_bytes=int(telemetry.get("peak_memory_bytes", 0)),
-                stdout=str(telemetry.get("stdout", "")),
-                stderr=str(telemetry.get("stderr", "")),
-                error_message=telemetry.get("error_message"),
+                stdout=stdout_str,
+                stderr=stderr_str,
+                error_message=err_msg,
             )
         except ImportError:
             return ExecutionResult(
@@ -212,6 +239,30 @@ class SubprocessEngine(BaseEngine):
             if limits.memory_limit_bytes > 0 and peak_mem > limits.memory_limit_bytes:
                 status = ExecutionStatus.MEMORY_LIMIT_EXCEEDED
 
+            err_msg: str | None = None
+            if limits.output_limit_bytes > 0:
+                stdout_b = stdout_str.encode("utf-8", errors="replace")
+                if len(stdout_b) > limits.output_limit_bytes:
+                    status = ExecutionStatus.OUTPUT_LIMIT_EXCEEDED
+                    err_msg = (
+                        f"Output limit exceeded ({limits.output_limit_bytes} bytes)"
+                    )
+                    stdout_str = (
+                        stdout_b[: limits.output_limit_bytes].decode(
+                            "utf-8", errors="ignore"
+                        )
+                        + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
+                    )
+
+                stderr_b = stderr_str.encode("utf-8", errors="replace")
+                if len(stderr_b) > limits.output_limit_bytes:
+                    stderr_str = (
+                        stderr_b[: limits.output_limit_bytes].decode(
+                            "utf-8", errors="ignore"
+                        )
+                        + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
+                    )
+
             return ExecutionResult(
                 status=status,
                 stdout=stdout_str,
@@ -219,6 +270,7 @@ class SubprocessEngine(BaseEngine):
                 exit_code=proc.returncode if proc.returncode is not None else 0,
                 cpu_time_ms=elapsed_ms,
                 peak_memory_bytes=peak_mem,
+                error_message=err_msg,
             )
         except subprocess.TimeoutExpired:
             if proc is not None:
