@@ -41,185 +41,226 @@ aestra --help
 
 ---
 
-## Competitive Programming User Guide
+## CLI Usage
 
-Aestra is built to test competitive programming solutions (Python, C++, Rust, Go) against directories of test cases.
+### Batch Testcase Runner
 
-### 1. Write Your Solution
-
-Create your problem solution (e.g., `solution.py` or compiled `solution.exe`):
-
-**Example: A + B Problem (`solution.py`)**
-```python
-import sys
-
-for line in sys.stdin:
-    if line.strip():
-        a, b = map(int, line.split())
-        print(a + b)
-```
-
-*(For C++, compile first: `g++ -O3 solution.cpp -o solution.exe`)*
-
-### 2. Prepare Test Cases
-
-Organize your test cases in a folder with matching `.in` (inputs) and `.out` or `.ans` (expected outputs):
-
-```text
-testcases/
-├── case1.in       # Content: 3 5
-├── case1.out      # Content: 8
-├── case2.in       # Content: 100 250
-├── case2.out      # Content: 350
-├── case3.in       # Content: -10 25
-└── case3.out      # Content: 15
-```
-
-### 3. Run the Batch Judge
-
-Run Aestra against your solution:
+Run a solution against a directory of `.in` and `.out` / `.ans` test pairs:
 
 ```bash
 aestra test solution.py --cases testcases/
 ```
 
-**Terminal Output:**
-```text
-  +-- [Batch Runner] -------------------------------------------+
-  |  Binary : solution.py                                       |
-  |  Cases  : 3 testcases from testcases/                       |
-  |  Limits : 2000ms CPU, 512MB RAM                             |
-  +-------------------------------------------------------------+
+### Single Program Execution with Live Telemetry
 
-  [ACCEPTED]               case1.in             55.9ms    10.5MB
-  [ACCEPTED]               case2.in             45.8ms    10.5MB
-  [ACCEPTED]               case3.in             44.3ms    10.5MB
-
-  =============================================================
-  Summary: 3/3 accepted (ALL PASSED) * 146.0ms * 10.5MB
-  =============================================================
-```
-
----
-
-### 4. Catching Bugs & Wrong Answers (WA)
-
-If your solution produces incorrect output, Aestra immediately pinpoints the mismatch:
-
-```text
-  [WRONG_ANSWER]           case2.in             42.1ms    10.5MB
-      Expected:
-      350
-      Got:
-      25000
-```
-
----
-
-## Single Program Execution with Live Telemetry
-
-To benchmark a single binary or script under strict hardware limits:
+Benchmark a binary or script under strict hardware limits:
 
 ```bash
 aestra run ./solution.exe --time-limit 1000 --memory-limit 256
 ```
 
-**Telemetry Output:**
-```text
-  +-- [Telemetry] ----------------------------------------------+
-  |  Status     : OK                                             |
-  |  CPU Time   : 64.6ms                                         |
-  |  Peak Memory: 12.4MB                                         |
-  |  Exit Code  : 0                                              |
-  +-------------------------------------------------------------+
-```
-
----
-
-## Output Checker Modes
-
-Configure how outputs are compared with the `--mode` flag:
-
-| Mode | Flag | Description | Comparison Style |
-| :--- | :--- | :--- | :--- |
-| **Token** *(default)* | `--mode token` | Compares whitespace-separated tokens. Ignores extra spaces and blank lines. | Whitespace-insensitive tokens |
-| **Exact** | `--mode exact` | Strict byte-by-byte comparison including exact newlines and whitespace. | Strict diff |
-| **Ignore Whitespace** | `--mode ignore_whitespace` | Strips all leading, trailing, and redundant whitespace. | Trimmed comparison |
+For advanced CLI options, checker modes (`token`, `exact`, `ignore_whitespace`), and telemetry details, visit the [Full Documentation](https://elitsuv.github.io/aestra/#test).
 
 ---
 
 ## Python SDK
 
-You can also embed Aestra into automated test scripts or local judges:
+Aestra provides a programmatic Python SDK designed for automated testing pipelines, custom judge platforms, stress-testing harnesses, and testcase reduction.
+
+Import the SDK interfaces directly:
 
 ```python
-from pathlib import Path
-from src import ExecutionLimits, get_engine, BatchRunner, OutputChecker, CheckerMode
-
-# 1. Single execution
-engine = get_engine()
-result = engine.execute(
-    Path("./solution.py"),
-    limits=ExecutionLimits(time_limit_ms=1000, memory_limit_mb=256),
-    input_data="10 20\n",
+from aestra import (
+    CheckerMode,
+    Config,
+    ExecutionStatus,
+    Fuzzer,
+    Judge,
+    Minimizer,
+    TestCase,
 )
-print(
-    f"Status: {result.status} | Time: {result.cpu_time_ms:.1f}ms | RAM: {result.peak_memory_mb:.1f}MB"
-)
-
-# 2. Batch testing
-runner = BatchRunner()
-batch = runner.run_batch(
-    Path("./solution.py"),
-    Path("./testcases"),
-    limits=ExecutionLimits(time_limit_ms=2000, memory_limit_mb=512),
-    mode=CheckerMode.TOKEN,
-)
-print(f"Passed: {batch.passed}/{batch.total} ({batch.overall_verdict})")
 ```
 
 ---
 
-## Architecture
+### Programmatic Judge (`Judge`)
 
-Aestra features an adaptive dual-engine architecture:
+The `Judge` class provides single-binary execution and automated batch evaluation under hardware constraints.
 
-```
-                      +-------------------+
-                      |    Aestra CLI     |
-                      +---------+---------+
-                                |
-                    +-----------v-----------+
-                    |  get_engine() Factory |
-                    +-----+-----------+-----+
-                          |           |
-            [Linux / POSIX]           [Windows / Fallback]
-                          |           |
-            +-------------v---+    +--v---------------+
-            |  NativeEngine   |    | SubprocessEngine |
-            |  (Rust PyO3)    |    | (Zero-build)     |
-            +--------+--------+    +--------+---------+
-                     |                      |
-            +--------v--------+             |
-            | POSIX setrlimit |             |
-            | wait4 telemetry |    +--------v---------+
-            +--------+--------+    | Wall-clock timer |
-                     |             | Process monitor  |
-            +--------v--------+    +--------+---------+
-            | Target Binary   |             |
-            +-----------------+    +--------v---------+
-                                   | Target Binary    |
-                                   +------------------+
+#### 1. Single Execution with Resource Telemetry
+
+Execute a target binary or script once with standard input and inspect CPU and memory telemetry:
+
+```python
+from aestra import Config, Judge
+
+# Initialize judge with custom resource limits
+config = Config(time_limit_ms=1000, memory_limit_mb=256)
+judge = Judge(config=config)
+
+# Run target program
+result = judge.run_single("solution.py", input_data="42 58\n")
+
+print(f"Status     : {result.status.value}")
+print(f"CPU Time   : {result.cpu_time_ms:.2f} ms")
+print(f"Peak Memory: {result.peak_memory_mb:.2f} MB")
+print(f"Output     : {result.stdout.strip()}")
 ```
 
-1. **`NativeEngine` (POSIX / Linux):** Low-level `fork`, `execve`, and `setrlimit` (`RLIMIT_CPU`, `RLIMIT_AS`) with microsecond `wait4` kernel telemetry.
-2. **`SubprocessEngine` (Cross-Platform / Windows):** Automatic zero-configuration fallback with Windows process memory accounting (`K32GetProcessMemoryInfo`) and POSIX child `ru_maxrss` metrics.
+#### 2. Evaluating Against a Testcase Directory
+
+Evaluate a solution across a directory containing `.in` and `.out` / `.ans` pairs:
+
+```python
+from aestra import Config, Judge
+
+judge = Judge(config=Config(time_limit_ms=2000, memory_limit_mb=512))
+batch = judge.run("solution.py", cases_dir="./testcases")
+
+print(f"Verdict: {batch.overall_verdict} ({batch.passed}/{batch.total} passed)")
+for test in batch.results:
+    print(
+        f"  [{test.verdict:<14}] {test.case_name:<15} {test.cpu_time_ms:.1f}ms  {test.peak_memory_mb:.1f}MB"
+    )
+```
+
+#### 3. In-Memory Test Suites
+
+Evaluate test cases defined dynamically in code without creating temporary files:
+
+```python
+from aestra import Judge, TestCase
+
+judge = Judge()
+cases = [
+    TestCase(name="sample_1", input_data="3 5\n", expected_output="8\n"),
+    TestCase(name="sample_2", input_data="10 -4\n", expected_output="6\n"),
+]
+
+batch = judge.run("solution.py", test_cases=cases)
+print(f"Passed {batch.passed} of {batch.total} tests.")
+```
+
+---
+
+### Automated Fuzzing & Differential Testing (`Fuzzer`)
+
+The `Fuzzer` generates randomized inputs to identify edge cases, timeouts, host resource exhaustion, or logic divergences.
+
+#### 1. Crash & Timeout Detection
+
+Stress-test a solution to verify it terminates safely without runtime errors or resource limit breaches:
+
+```python
+from aestra import Config, Fuzzer
+
+fuzzer = Fuzzer(
+    target_binary="solution.py",
+    config=Config(time_limit_ms=500, memory_limit_mb=128),
+)
+
+report = fuzzer.run(iterations=500)
+if report.found_bug:
+    print(f"Bug discovered on iteration {report.iterations_run}:")
+    print(f"Error: {report.error_message}")
+    print(f"Failing Input:\n{report.failing_input}")
+else:
+    print(f"All {report.iterations_run} fuzz iterations passed.")
+```
+
+#### 2. Differential Testing Against an Oracle
+
+Compare outputs against a trusted reference binary or Python function:
+
+```python
+from aestra import Fuzzer
+
+
+# Trusted reference solution (e.g. brute-force or Python model)
+def reference_oracle(input_str: str) -> str:
+    nums = [int(x) for x in input_str.split() if x.strip()]
+    return str(sum(nums))
+
+
+# Custom input generator for stress testing
+def generate_random_case(iteration: int) -> str:
+    import random
+
+    n = random.randint(1, 50)
+    vals = [str(random.randint(-1000, 1000)) for _ in range(n)]
+    return f"{n}\n" + " ".join(vals) + "\n"
+
+
+fuzzer = Fuzzer(
+    target_binary="optimized_solution.exe",
+    oracle=reference_oracle,
+    generator=generate_random_case,
+)
+
+report = fuzzer.run(iterations=250)
+if report.found_bug:
+    print("Divergence identified!")
+    print(f"Failing input: {report.failing_input}")
+    print(f"Details: {report.error_message}")
+```
+
+---
+
+### Delta-Debugging Testcase Minimizer (`Minimizer`)
+
+When fuzzing uncovers a failure with a large input, `Minimizer` uses hierarchical Delta Debugging (DDmin) across line and token granularities to shrink the input to the smallest reproducible failure:
+
+```python
+from aestra import Minimizer
+
+
+def reference_oracle(input_str: str) -> str:
+    nums = [int(x) for x in input_str.split() if x.strip()]
+    return str(sum(nums))
+
+
+minimizer = Minimizer(
+    target_binary="solution.py",
+    oracle=reference_oracle,
+)
+
+large_failing_input = "50\n" + " ".join(str(i) for i in range(500)) + "\n"
+
+# Reduces multi-line and multi-token inputs down to minimal reproduction
+minimal_input = minimizer.minimize(large_failing_input, max_steps=200)
+
+print("Minimal reproducible input:")
+print(minimal_input)
+```
+
+---
+
+### Configuration & TOML Integration (`Config`)
+
+Aestra configuration can be defined programmatically or loaded directly from an `aestra.toml` file:
+
+```python
+from aestra import CheckerMode, Config, Judge
+
+# Programmatic configuration
+config = Config(
+    time_limit_ms=1500,
+    memory_limit_mb=256,
+    checker_mode=CheckerMode.TOKEN,  # TOKEN, EXACT, IGNORE_WHITESPACE
+    output_limit_bytes=10 * 1024 * 1024,  # Maximum captured output bytes
+)
+
+# Or load from an aestra.toml file
+config_from_file = Config.from_toml("aestra.toml")
+
+judge = Judge(config=config_from_file)
+```
 
 ---
 
 ## Development & Testing
 
-Run the complete 13-test engine suite:
+Run the complete 23-test engine suite:
 
 ```bash
 python -m tests.test
