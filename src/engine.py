@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from src.config import ExecutionLimits
 from src.models import ExecutionResult, ExecutionStatus
@@ -179,13 +180,13 @@ def _measure_posix_peak_memory() -> int:
     with contextlib.suppress(Exception):
         import resource
 
+        getrusage: Any = getattr(resource, "getrusage", None)
         rusage_children = getattr(resource, "RUSAGE_CHILDREN", None)
-        if rusage_children is None:
-            return 0
-        usage = resource.getrusage(rusage_children)
-        if sys.platform == "darwin":
-            return int(usage.ru_maxrss)
-        return int(usage.ru_maxrss * 1024)
+        if callable(getrusage) and rusage_children is not None:
+            usage = getrusage(rusage_children)
+            if sys.platform == "darwin":
+                return int(usage.ru_maxrss)
+            return int(usage.ru_maxrss * 1024)
     return 0
 
 
