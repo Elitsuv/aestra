@@ -1,4 +1,4 @@
-name: Automated PR Reviewer
+name: PR Quality Commenter
 
 on:
   pull_request_target:
@@ -6,83 +6,115 @@ on:
 
 permissions:
   pull-requests: write
-  contents: write
+  contents: read
 
 jobs:
-  review:
-    name: Code Review & Verification
+  check-and-comment:
+    name: PR Quality Checks & Suggestions
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR Code
         uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install Quality Tools
         run: |
           python -m pip install --upgrade pip
           pip install ruff mypy
 
-      - name: Run CI Verification Checks
-        id: test_run
-        continue-on-error: true
+      - name: Run Quality Verification & Generate Report
+        id: verify
         run: |
-          echo "REPORT<<EOF" >> $GITHUB_ENV
-          FAILURES=0
+          python -c '
+          import subprocess
+          import sys
 
-          echo "### Code Review Report" >> $GITHUB_ENV
-          echo "" >> $GITHUB_ENV
+          results = []
+          suggestions = []
+          failures = 0
 
-          if ruff check .; then
-            echo "- ✅ **Linting (Ruff):** Clean syntax" >> $GITHUB_ENV
-          else
-            echo "- ❌ **Linting (Ruff):** Issues found. Run \`ruff check .\`" >> $GITHUB_ENV
-            FAILURES=$((FAILURES + 1))
-          fi
+          # 1. Ruff Lint
+          res_lint = subprocess.run(["ruff", "check", "."], capture_output=True, text=True)
+          if res_lint.returncode == 0:
+              results.append(("- **Linting (Ruff)**: PASSED", "Clean syntax and code style."))
+          else:
+              failures += 1
+              results.append(("- **Linting (Ruff)**: FAILED", "Syntax or style issues detected."))
+              suggestions.append("#### Linting Issues\n```\n" + res_lint.stdout.strip() + "\n```\n**Suggested Fix:** Run `ruff check --fix .` locally.")
 
-          if ruff format --check .; then
-            echo "- ✅ **Formatting (Ruff):** Properly formatted" >> $GITHUB_ENV
-          else
-            echo "- ❌ **Formatting (Ruff):** Format mismatch. Run \`ruff format .\`" >> $GITHUB_ENV
-            FAILURES=$((FAILURES + 1))
-          fi
+          # 2. Ruff Format
+          res_fmt = subprocess.run(["ruff", "format", "--check", "."], capture_output=True, text=True)
+          if res_fmt.returncode == 0:
+              results.append(("- **Formatting (Ruff)**: PASSED", "Consistent formatting."))
+          else:
+              failures += 1
+              results.append(("- **Formatting (Ruff)**: FAILED", "Formatting mismatches found."))
+              suggestions.append("#### Formatting Issues\n```\n" + (res_fmt.stderr or res_fmt.stdout).strip() + "\n```\n**Suggested Fix:** Run `ruff format .` to reformat files.")
 
-          if mypy src/; then
-            echo "- ✅ **Type Safety (Mypy):** Strict types passed" >> $GITHUB_ENV
-          else
-            echo "- ❌ **Type Safety (Mypy):** Type errors found. Run \`mypy src/\`" >> $GITHUB_ENV
-            FAILURES=$((FAILURES + 1))
-          fi
+          # 3. Mypy Types
+          res_mypy = subprocess.run(["mypy", "src/"], capture_output=True, text=True)
+          if res_mypy.returncode == 0:
+              results.append(("- **Type Safety (Mypy)**: PASSED", "Strict typing verified."))
+          else:
+              failures += 1
+              results.append(("- **Type Safety (Mypy)**: FAILED", "Type errors found in `src/`."))
+              suggestions.append("#### Type Safety Issues\n```\n" + res_mypy.stdout.strip() + "\n```\n**Suggested Fix:** Resolve type annotation errors shown above.")
 
-          if python -m tests.test; then
-            echo "- ✅ **Unit Tests:** 13/13 passed without regression" >> $GITHUB_ENV
-          else
-            echo "- ❌ **Unit Tests:** Test failures detected" >> $GITHUB_ENV
-            FAILURES=$((FAILURES + 1))
-          fi
+          # 4. Unit Tests
+          res_test = subprocess.run([sys.executable, "-m", "tests.test"], capture_output=True, text=True)
+          if res_test.returncode == 0:
+              results.append(("- **Unit Tests**: PASSED", "All unified engine and safety tests passed."))
+          else:
+              failures += 1
+              results.append(("- **Unit Tests**: FAILED", "Test suite regressions detected."))
+              err_snippet = "\n".join(res_test.stdout.strip().splitlines()[-25:])
+              suggestions.append("#### Test Failures\n```\n" + err_snippet + "\n```\n**Suggested Fix:** Run `python -m tests.test` locally to reproduce and debug failures.")
 
-          echo "EOF" >> $GITHUB_ENV
-          exit $FAILURES
+          # Generate Markdown
+          verdict_title = "All Checks Passed" if failures == 0 else f"{failures} Check(s) Need Attention"
+          status_icon = "[PASS]" if failures == 0 else "[FAIL]"
 
-      - name: Submit Official PR Review (Approve or Request Changes)
+          lines = [
+              f"### {status_icon} Automated PR Quality Report: {verdict_title}",
+              "",
+              "| Check | Verdict | Notes |",
+              "| :--- | :--- | :--- |",
+          ]
+
+          for name, note in results:
+              clean_name = name.replace("- **", "").replace("**", "")
+              parts = clean_name.split(": ")
+              check_name = parts[0]
+              status = parts[1]
+              lines.append(f"| **{check_name}** | `{status}` | {note} |")
+
+          lines.append("")
+          if failures == 0:
+              lines.append("**Summary:** This PR passes all automated code quality and regression checks. Ready for maintainer review.")
+          else:
+              lines.append("### Recommended Changes & Action Items")
+              lines.append("")
+              lines.extend(suggestions)
+              lines.append("")
+              lines.append("> Please push an update to resolve the issues above before merging.")
+
+          with open("pr_report.md", "w", encoding="utf-8") as f:
+              f.write("\n".join(lines) + "\n")
+          '
+
+      - name: Post PR Comment
         if: always()
         run: |
-          PR_NUM="${{ github.event.pull_request.number }}"
-          if [ "${{ steps.test_run.outcome }}" = "success" ]; then
-            gh pr review "$PR_NUM" --approve --body "$REPORT
-
-  ---
-  **Verdict:** ✅ **Approved for merge.** All verification tests and strict quality checks passed!"
-          else
-            gh pr review "$PR_NUM" --request-changes --body "$REPORT
-
-  ---
-  **Verdict:** ❌ **Changes requested.** Please fix the failing checks on this branch and push an update before merging."
+          if [ -f "pr_report.md" ]; then
+            gh pr comment "${{ github.event.pull_request.number }}" --body-file pr_report.md
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
