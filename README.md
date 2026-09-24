@@ -260,7 +260,7 @@ judge = Judge(config=config_from_file)
 
 ## Development & Testing
 
-Run the complete 23-test engine suite:
+Run the complete 24-test engine suite:
 
 ```bash
 python -m tests.test

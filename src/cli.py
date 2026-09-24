@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from src.checker import CheckerMode
+from src.compiler import CompilationError, CompilerManager
 from src.config import ExecutionLimits
 from src.engine import get_engine
 from src.runner import BatchRunner
@@ -18,9 +19,18 @@ BANNER = """
 
 
 def run_command(args: argparse.Namespace) -> int:
-    source_path = Path(args.binary)
-    if not source_path.exists():
-        print(f"Error: Binary '{source_path}' not found.", file=sys.stderr)
+    raw_path = Path(args.binary)
+    if not raw_path.exists():
+        print(f"Error: Target '{raw_path}' not found.", file=sys.stderr)
+        return 1
+
+    try:
+        comp_res = CompilerManager.prepare(raw_path)
+        source_path = comp_res.executable_path
+        if not comp_res.cached:
+            print(f"  [Compiled] {raw_path.name} -> {source_path.name}")
+    except CompilationError as e:
+        print(f"\n  [COMPILATION_ERROR]\n{e.message}", file=sys.stderr)
         return 1
 
     engine = get_engine()
@@ -50,9 +60,18 @@ def run_command(args: argparse.Namespace) -> int:
 
 
 def test_command(args: argparse.Namespace) -> int:
-    source_path = Path(args.binary)
-    if not source_path.exists():
-        print(f"Error: Binary '{source_path}' not found.", file=sys.stderr)
+    raw_path = Path(args.binary)
+    if not raw_path.exists():
+        print(f"Error: Target '{raw_path}' not found.", file=sys.stderr)
+        return 1
+
+    try:
+        comp_res = CompilerManager.prepare(raw_path)
+        source_path = comp_res.executable_path
+        if not comp_res.cached:
+            print(f"  [Compiled] {raw_path.name} -> {source_path.name}")
+    except CompilationError as e:
+        print(f"\n  [COMPILATION_ERROR]\n{e.message}", file=sys.stderr)
         return 1
 
     cases_dir = Path(args.cases)
