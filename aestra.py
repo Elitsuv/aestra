@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.checker import CheckerMode, CheckResult, OutputChecker
+from src.compiler import CompilationError, CompilationResult, CompilerManager
 from src.config import Config, ExecutionLimits
 from src.engine import (
     BaseEngine,
@@ -19,6 +20,9 @@ __all__ = [
     "BatchRunner",
     "CheckResult",
     "CheckerMode",
+    "CompilationError",
+    "CompilationResult",
+    "CompilerManager",
     "Config",
     "ExecutionLimits",
     "ExecutionResult",

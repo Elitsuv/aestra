@@ -363,6 +363,34 @@ def test_safety_minimizer_hierarchical_ddmin() -> None:
         assert len(minimized.splitlines()) == 1
 
 
+def test_compiler_manager_caching_and_passthrough() -> None:
+    from src.compiler import CompilerManager
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+
+        # 1. Non-source files (e.g. .py scripts) pass through directly
+        dummy_py = tmp_path / "solution.py"
+        dummy_py.write_text("print('test')\n")
+        res = CompilerManager.prepare(dummy_py)
+        assert res.success is True
+        assert res.executable_path == dummy_py.resolve()
+        assert res.cached is True
+
+        # 2. Precompiled binary / non-source pass through
+        dummy_bin = tmp_path / "solution.exe"
+        dummy_bin.write_text("mock")
+        res_bin = CompilerManager.prepare(dummy_bin)
+        assert res_bin.executable_path == dummy_bin.resolve()
+        assert res_bin.cached is True
+
+        # 3. Source hash computation reacts to content changes
+        h1 = CompilerManager.get_source_hash(dummy_py)
+        dummy_py.write_text("print('modified')\n")
+        h2 = CompilerManager.get_source_hash(dummy_py)
+        assert h1 != h2
+
+
 # =====================================================================
 # MAIN RUNNER
 # =====================================================================
@@ -395,6 +423,10 @@ ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
     (
         "Safety Minimizer Hierarchical DDmin",
         test_safety_minimizer_hierarchical_ddmin,
+    ),
+    (
+        "Compiler Manager Passthrough & Caching",
+        test_compiler_manager_caching_and_passthrough,
     ),
 ]
 
