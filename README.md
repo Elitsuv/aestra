@@ -1,7 +1,7 @@
 <p align="left">
   <img src="assets/aestra.png" width="70" alt="Aestra Logo" align="left" style="margin-right: 15px;">
   <strong><font size="6">Aestra</font></strong><br>
-  <a href="https://github.com/Elitsuv/aestra/releases"><img src="https://img.shields.io/badge/version-v0.1.2-blue.svg" alt="Version"></a>
+  <a href="https://github.com/Elitsuv/aestra/releases"><img src="https://img.shields.io/badge/version-v1.0.0-blue.svg" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://github.com/Elitsuv/aestra/actions/workflows/ci.yml"><img src="https://github.com/Elitsuv/aestra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://elitsuv.github.io/aestra/"><img src="https://img.shields.io/badge/docs-live-cyan.svg" alt="Docs"></a>
@@ -11,44 +11,70 @@
 
 **Aestra** is a deterministic execution sandbox and competitive programming testing engine designed to enforce hardware constraints—CPU time and peak memory limits—with microsecond accuracy.
 
-Built with a low-overhead **Rust POSIX kernel core**, a universal cross-platform fallback, an automated **differential output checker**, and a terminal CLI.
+Built with a low-overhead **Rust POSIX kernel core**, a universal cross-platform fallback, an automated **differential output checker**, multi-language compilation with incremental caching (C++, C, Rust, Go, Python), an extensible **plugin system**, and an interactive terminal CLI.
 
 [Read the Full Documentation & Guides](https://elitsuv.github.io/aestra/)
 
-> [!WARNING]
-> **Active Development & Sandboxing Notice**: Aestra is currently in active development (`v0.1.x`). While hardware resource limits (CPU timeouts, memory bounds, and wall-clock watchdogs) are enforced, Aestra runs in user space and is designed for **local competitive programming benchmarking and testcase verification**. It should not be deployed as an uncontained multi-tenant public judge for untrusted or hostile code without additional containerized isolation (e.g Docker, cgroups v2, or dedicated VMs).
+> [!NOTE]
+> **v1.0.0 Stable Launch (Windows)**: Aestra is built specifically for Windows. **You DO NOT need Rust, MSVC, or any C++ compiler to run Aestra.** Standard Python 3.10+ is all that is required. The universal `SubprocessEngine` directly queries Windows kernel memory via `K32GetProcessMemoryInfo` for microsecond peak RAM and execution tracking with zero host pollution.
 
 ---
 
-## Quickstart
+## 1-Click Installation (Windows Only)
 
-Install Aestra globally with a single command (no admin privileges or Rust compiler required):
+Install Aestra in seconds with the graphical Setup Wizard (**Zero Rust or compilers required**):
 
-### Windows (PowerShell)
+### Method A: Graphical Wizard (Double-Click)
+If you downloaded or extracted Aestra, double-click [`install.bat`](file:///c:/Users/jeezh/OneDrive/Desktop/aestra/aestra/install.bat) in the root folder.
+- Launches a native Windows Setup Wizard window with the branded **Aestra App Icon**
+- Adds `aestra` permanently to your User `PATH` (no admin rights needed)
+- Creates an **Aestra** Desktop shortcut
+- Verifies your environment automatically
+
+### Method B: PowerShell One-Liner
 ```powershell
 iex (irm https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.ps1)
 ```
 
-### Linux / macOS (Bash)
+Once installed, open **any** terminal and run:
 ```bash
-curl -sSL https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.sh | bash
-```
-
-Once installed, the `aestra` command is available globally in any terminal:
-```bash
-aestra --help
+aestra
 ```
 
 ---
 
-## CLI Usage
+## Interactive AI-CLI Window
+
+When you type `aestra` in your terminal without flags, Aestra opens an interactive console window:
+
+```text
+  +-------------------------------------------------------------+
+  |  AESTRA  *  Deterministic CP Execution Sandbox     v1.0.0  |
+  |  Microsecond telemetry * Multi-language * Zero PC footprint |
+  +-------------------------------------------------------------+
+
+  [1] Run Solution      - Execute source or binary with microsecond telemetry
+  [2] Batch Test Suite  - Test solution against .in / .out cases directory
+  [3] Stress & Fuzz     - Automated randomized fuzzing against edge cases
+  [4] System Doctor     - Inspect system compilers and environment health
+  [5] Clean Cache       - Wipe local compilation artifacts (.aestra/build)
+  [0] Exit              - Quit Aestra
+
+  aestra> 
+```
+
+---
+
+## CLI Commands
+
+You can also use Aestra directly as a scriptable command-line utility:
 
 ### Batch Testcase Runner
 
-Run a solution against a directory of `.in` and `.out` / `.ans` test pairs:
+Run a solution (supports `.cpp`, `.rs`, `.go`, `.py`, or `.exe`) against a directory of `.in` and `.out` / `.ans` test pairs:
 
 ```bash
-aestra test solution.py --cases testcases/
+aestra test solution.cpp --cases testcases/
 ```
 
 ### Single Program Execution with Live Telemetry
@@ -56,12 +82,16 @@ aestra test solution.py --cases testcases/
 Benchmark a binary or script under strict hardware limits:
 
 ```bash
-aestra run ./solution.exe --time-limit 1000 --memory-limit 256
+aestra run ./solution.cpp --time-limit 1000 --memory-limit 256
 ```
 
-For advanced CLI options, checker modes (`token`, `exact`, `ignore_whitespace`), and telemetry details, visit the [Full Documentation](https://elitsuv.github.io/aestra/#test).
+### System Toolchain Doctor
 
----
+Inspect your active execution engine and detected compilers:
+
+```bash
+aestra doctor
+```
 
 ## Python SDK
 
@@ -260,7 +290,7 @@ judge = Judge(config=config_from_file)
 
 ## Development & Testing
 
-Run the complete 24-test engine suite:
+Run the complete 27-test unified suite:
 
 ```bash
 python -m tests.test
@@ -279,3 +309,4 @@ python -m mypy src
 ## License
 
 Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
+

@@ -67,7 +67,6 @@ class CompilerManager:
         if not path.exists():
             raise FileNotFoundError(f"Target file '{path}' does not exist.")
 
-        # Non-source files (e.g., Python scripts or pre-compiled binaries) pass through
         if not cls.is_source_file(path):
             return CompilationResult(
                 success=True,
@@ -86,6 +85,32 @@ class CompilerManager:
             return cls._compile_go(path)
 
         raise CompilationError(f"Unsupported source extension: {suffix}")
+
+    @classmethod
+    def detect_compilers(cls) -> dict[str, str | None]:
+        """Detects available compilers and runtime interpreters on PATH."""
+        return {
+            "Python": sys.executable,
+            "C++": shutil.which("g++") or shutil.which("clang++"),
+            "C": shutil.which("gcc") or shutil.which("clang"),
+            "Rust": shutil.which("rustc"),
+            "Go": shutil.which("go"),
+        }
+
+    @classmethod
+    def clean_cache(cls) -> int:
+        """Removes cached compilation binaries from .aestra/build."""
+        if not cls.BUILD_DIR.exists():
+            return 0
+        count = 0
+        for item in cls.BUILD_DIR.iterdir():
+            if item.is_file():
+                try:
+                    item.unlink()
+                    count += 1
+                except OSError:
+                    pass
+        return count
 
     @classmethod
     def _get_output_binary_path(cls, source_path: Path, source_hash: str) -> Path:
