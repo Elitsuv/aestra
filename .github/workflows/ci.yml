@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   python-quality:
-    name: Python Quality & Type Checks Python ${{ matrix.python-version }})
+    name: Python Quality & Type Checks (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

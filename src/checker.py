@@ -10,13 +10,15 @@ class CheckerMode(str, Enum):
     IGNORE_WHITESPACE = "IGNORE_WHITESPACE"
 
 
-@dataclass
+@dataclass(frozen=True)
 class CheckResult:
     is_correct: bool
     diff: str | None = None
 
 
 class OutputChecker:
+    """Compares actual program output against expected output."""
+
     def __init__(self, mode: CheckerMode = CheckerMode.TOKEN) -> None:
         self.mode = mode
 

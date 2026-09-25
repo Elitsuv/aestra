@@ -162,6 +162,23 @@ def test_cli_executable() -> None:
     assert exit_code == 0
 
 
+def test_cli_batch_test_command() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        folder = Path(tmpdir)
+        sol = folder / "solution.py"
+        sol.write_text("import sys; print(sum(map(int, sys.stdin.read().split())))")
+
+        cases_dir = folder / "cases"
+        cases_dir.mkdir()
+        (cases_dir / "01.in").write_text("10 20\n")
+        (cases_dir / "01.out").write_text("30\n")
+
+        exit_code = cli_main(
+            ["test", str(sol), "--cases", str(cases_dir), "--mode", "token"]
+        )
+        assert exit_code == 0
+
+
 def test_cli_missing_binary() -> None:
     exit_code = cli_main(["run", "non_existent_binary_xyz_123.exe"])
     assert exit_code == 1
@@ -391,6 +408,24 @@ def test_compiler_manager_caching_and_passthrough() -> None:
         assert h1 != h2
 
 
+def test_cli_doctor_command() -> None:
+    from src.cli import doctor_command
+
+    exit_code = doctor_command()
+    assert exit_code == 0
+
+
+def test_compiler_clean_cache() -> None:
+    from src.compiler import CompilerManager
+
+    CompilerManager.BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    dummy_file = CompilerManager.BUILD_DIR / "temp_test_artifact.tmp"
+    dummy_file.write_text("test")
+    cleaned = CompilerManager.clean_cache()
+    assert cleaned >= 1
+    assert not dummy_file.exists()
+
+
 # =====================================================================
 # MAIN RUNNER
 # =====================================================================
@@ -407,6 +442,7 @@ ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
     ("Runner Case Verdicts", test_runner_run_case_verdicts),
     ("Runner Batch Aggregation", test_runner_batch_aggregation),
     ("CLI Executable Run", test_cli_executable),
+    ("CLI Batch Test Suite", test_cli_batch_test_command),
     ("CLI Missing Binary Handling", test_cli_missing_binary),
     ("SDK Imports and Exports", test_sdk_imports_and_exports),
     ("SDK Config TOML Parsing", test_sdk_config_toml),
@@ -427,6 +463,14 @@ ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
     (
         "Compiler Manager Passthrough & Caching",
         test_compiler_manager_caching_and_passthrough,
+    ),
+    (
+        "CLI Doctor Diagnostics",
+        test_cli_doctor_command,
+    ),
+    (
+        "Compiler Manager Clean Cache",
+        test_compiler_clean_cache,
     ),
 ]
 
