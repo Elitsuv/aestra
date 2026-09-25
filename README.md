@@ -43,7 +43,7 @@ aestra
 
 ---
 
-## Interactive AI-CLI Window
+## Interactive CLI Window
 
 When you type `aestra` in your terminal without flags, Aestra opens an interactive console window:
 
