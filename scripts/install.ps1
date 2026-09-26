@@ -1,12 +1,11 @@
 Write-Host ""
 Write-Host "  +-------------------------------------------------------------+" -ForegroundColor Cyan
-Write-Host "  |  AESTRA SETUP WIZARD  *  v1.0.0 Stable Launch (Windows)    |" -ForegroundColor Cyan
+Write-Host "  |  AESTRA SETUP WIZARD  *  v1.0.1 Stable Launch (Windows)    |" -ForegroundColor Cyan
 Write-Host "  |  Deterministic CP Execution Sandbox & Microsecond Telemetry |" -ForegroundColor Cyan
 Write-Host "  +-------------------------------------------------------------+" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. Detect Python
-Write-Host "  [Step 1/5] Checking Python environment..." -ForegroundColor White
+Write-Host "  Checking Python environment..." -ForegroundColor White
 $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
 if (-not $pythonCmd) { $pythonCmd = Get-Command python3 -ErrorAction SilentlyContinue }
 if (-not $pythonCmd) { $pythonCmd = Get-Command py -ErrorAction SilentlyContinue }
@@ -21,8 +20,7 @@ if (-not $pythonCmd) {
 $pyVersion = & $pythonCmd.Source -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
 Write-Host "  [OK] Python $pyVersion detected ($($pythonCmd.Source))" -ForegroundColor Green
 
-# 2. Determine target install directory
-Write-Host "`n  [Step 2/5] Setting up Aestra core files..." -ForegroundColor White
+Write-Host "`n  Setting up Aestra core files..." -ForegroundColor White
 $installDir = Join-Path $HOME ".aestra"
 $isLocalRepo = (Test-Path "pyproject.toml") -and (Test-Path "src")
 
@@ -59,8 +57,9 @@ if (-not $isLocalRepo) {
     }
 }
 
-# 3. Create execution shims & binary directory
-Write-Host "`n  [Step 3/5] Creating global CLI launcher..." -ForegroundColor White
+Get-ChildItem -LiteralPath $installDir -Recurse -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+
+Write-Host "`n  Creating global CLI launcher..." -ForegroundColor White
 $binDir = Join-Path $installDir "bin"
 if (-not (Test-Path $binDir)) {
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
@@ -71,15 +70,13 @@ Set-Content -Path (Join-Path $binDir "aestra.bat") -Value $batContent -Encoding 
 Set-Content -Path (Join-Path $binDir "aestra.cmd") -Value $batContent -Encoding Ascii
 Set-Content -Path (Join-Path $repoRoot "aestra.bat") -Value $batContent -Encoding Ascii
 
-# Also register in Python Scripts directory if accessible
 $pyScriptsDir = Join-Path (Split-Path $pythonCmd.Source) "Scripts"
 if (Test-Path $pyScriptsDir) {
     Set-Content -Path (Join-Path $pyScriptsDir "aestra.bat") -Value $batContent -Encoding Ascii
     Set-Content -Path (Join-Path $pyScriptsDir "aestra.cmd") -Value $batContent -Encoding Ascii
 }
 
-# 4. Install App Icon and Desktop Shortcut
-Write-Host "`n  [Step 4/5] Configuring App Icon and Shortcuts..." -ForegroundColor White
+Write-Host "`n  Configuring App Icon and Shortcuts..." -ForegroundColor White
 $assetsTarget = Join-Path $installDir "assets"
 if (-not (Test-Path $assetsTarget)) {
     New-Item -ItemType Directory -Force -Path $assetsTarget | Out-Null
@@ -108,8 +105,7 @@ try {
     Write-Host "  [!] Desktop shortcut creation skipped (non-critical)" -ForegroundColor Yellow
 }
 
-# 5. Permanent PATH registration
-Write-Host "`n  [Step 5/5] Registering global PATH variable..." -ForegroundColor White
+Write-Host "`n  Registering global PATH variable..." -ForegroundColor White
 $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 if ($userPath -notlike "*$binDir*") {
     [Environment]::SetEnvironmentVariable("PATH", "$userPath;$binDir", "User")
@@ -121,7 +117,7 @@ if ($env:PATH -notlike "*$binDir*") {
 
 Write-Host ""
 Write-Host "  +-------------------------------------------------------------+" -ForegroundColor Green
-Write-Host "  |  [OK] AESTRA v1.0.0 INSTALLED SUCCESSFULLY                  |" -ForegroundColor Green
+Write-Host "  |  [OK] AESTRA v1.0.1 INSTALLED SUCCESSFULLY                  |" -ForegroundColor Green
 Write-Host "  +-------------------------------------------------------------+" -ForegroundColor Green
 Write-Host "  Installation Path : $repoRoot" -ForegroundColor Gray
 Write-Host "  Global Command    : aestra (Available in any terminal)" -ForegroundColor Gray

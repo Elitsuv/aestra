@@ -12,20 +12,51 @@ from src.engine import NativeEngine, get_engine
 from src.runner import BatchRunner
 from src.sdk import Fuzzer
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
+
+
+def _enable_windows_ansi() -> None:
+    """Enables virtual terminal processing on Windows consoles via Win32 API."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        h_stdout = kernel32.GetStdHandle(-11)
+        mode = ctypes.c_ulong()
+        if kernel32.GetConsoleMode(h_stdout, ctypes.byref(mode)):
+            kernel32.SetConsoleMode(h_stdout, mode.value | 0x0004)
+    except (AttributeError, OSError):
+        pass
+
+
+class Color:
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    MAGENTA = "\033[95m"
+    CYAN = "\033[96m"
+    WHITE = "\033[97m"
+    GRAY = "\033[90m"
+
 
 BANNER = f"""
-  +-------------------------------------------------------------+
-  |  AESTRA  *  Deterministic CP Execution Sandbox     v{VERSION}  |
+  {Color.CYAN}+-------------------------------------------------------------+
+  |  {Color.BOLD}AESTRA{Color.RESET}{Color.CYAN}  *  Deterministic CP Execution Sandbox     {Color.YELLOW}v{VERSION}{Color.CYAN}  |
   |  Microsecond telemetry & hardware-level resource limits     |
-  +-------------------------------------------------------------+
+  +-------------------------------------------------------------+{Color.RESET}
 """
 
 SHELL_HEADER = f"""
-  +-------------------------------------------------------------+
-  |  AESTRA  *  Deterministic CP Execution Sandbox     v{VERSION}  |
+  {Color.CYAN}+-------------------------------------------------------------+
+  |  {Color.BOLD}AESTRA{Color.RESET}{Color.CYAN}  *  Deterministic CP Execution Sandbox     {Color.YELLOW}v{VERSION}{Color.CYAN}  |
   |  Microsecond telemetry * Multi-language * Zero PC footprint |
-  +-------------------------------------------------------------+
+  +-------------------------------------------------------------+{Color.RESET}
 """
 
 
@@ -35,19 +66,53 @@ def _clean_path_input(raw: str) -> Path:
     return Path(cleaned)
 
 
+def _validate_source_file(path: Path) -> str | None:
+    """Validates that target file exists and is not empty. Returns error message or None."""
+    if not path.exists():
+        return f"Target '{path}' not found."
+    if not path.is_file():
+        return f"Target '{path}' is a directory, not a file."
+    try:
+        if path.stat().st_size == 0:
+            return (
+                f"Target file '{path.name}' is empty (0 bytes). "
+                f"Please add your solution code to the file before executing."
+            )
+        # Check if small source text file is whitespace-only
+        if (
+            path.suffix.lower() in (".py", ".cpp", ".c", ".cc", ".rs", ".go")
+            and path.stat().st_size < 50_000
+        ):
+            content = path.read_text(encoding="utf-8", errors="ignore").strip()
+            if not content:
+                return (
+                    f"Target file '{path.name}' contains only whitespace. "
+                    f"Please add your solution code to the file before executing."
+                )
+    except OSError as err:
+        return f"Cannot read '{path}': {err}"
+    return None
+
+
 def run_command(args: argparse.Namespace) -> int:
     raw_path = Path(args.binary)
-    if not raw_path.exists():
-        print(f"Error: Target '{raw_path}' not found.", file=sys.stderr)
+    validation_err = _validate_source_file(raw_path)
+    if validation_err:
+        print(f"Error: {validation_err}", file=sys.stderr)
         return 1
 
     try:
         comp_res = CompilerManager.prepare(raw_path)
         source_path = comp_res.executable_path
         if not comp_res.cached:
-            print(f"  [Compiled] {raw_path.name} -> {source_path.name}")
+            print(
+                f"  {Color.CYAN}[Compiled]{Color.RESET} {raw_path.name} -> {source_path.name}"
+            )
     except CompilationError as e:
-        print(f"\n  [COMPILATION_ERROR]\n{e.message}", file=sys.stderr)
+        print(
+            f"\n  {Color.RED}[COMPILATION_ERROR]{Color.RESET}\n{e.message}",
+            file=sys.stderr,
+        )
         return 1
 
     engine = get_engine()
@@ -59,18 +124,31 @@ def run_command(args: argparse.Namespace) -> int:
     input_data = args.input if args.input is not None else ""
     result = engine.execute(source_path, limits, input_data=input_data)
 
-    print("\n  +-- [Telemetry] ----------------------------------------------+")
-    print(f"  |  Status     : {result.status.value:<46} |")
-    print(f"  |  CPU Time   : {f'{result.cpu_time_ms:.1f}ms':<46} |")
-    print(f"  |  Peak Memory: {f'{result.peak_memory_mb:.1f}MB':<46} |")
+    status_color = Color.GREEN if result.is_success else Color.RED
+    print(
+        f"\n  {Color.CYAN}+-- [Telemetry] ----------------------------------------------+{Color.RESET}"
+    )
+    print(f"  |  Status     : {status_color}{result.status.value:<46}{Color.RESET} |")
+    print(
+        f"  |  CPU Time   : {Color.BOLD}{f'{result.cpu_time_ms:.1f}ms':<46}{Color.RESET} |"
+    )
+    print(
+        f"  |  Peak Memory: {Color.BOLD}{f'{result.peak_memory_mb:.1f}MB':<46}{Color.RESET} |"
+    )
     print(f"  |  Exit Code  : {result.exit_code!s:<46} |")
-    print("  +-------------------------------------------------------------+")
+    print(
+        f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}"
+    )
+
+    if input_data:
+        print(f"\n{Color.YELLOW}[Input (stdin)]{Color.RESET}")
+        print(input_data.rstrip())
 
     if result.stdout:
-        print("\n[Output]")
+        print(f"\n{Color.GREEN}[Output]{Color.RESET}")
         print(result.stdout.rstrip())
     if result.stderr:
-        print("\n[Error]")
+        print(f"\n{Color.RED}[Error]{Color.RESET}", file=sys.stderr)
         print(result.stderr.rstrip(), file=sys.stderr)
 
     return 0 if result.is_success else 1
@@ -78,17 +156,23 @@ def run_command(args: argparse.Namespace) -> int:
 
 def test_command(args: argparse.Namespace) -> int:
     raw_path = Path(args.binary)
-    if not raw_path.exists():
-        print(f"Error: Target '{raw_path}' not found.", file=sys.stderr)
+    validation_err = _validate_source_file(raw_path)
+    if validation_err:
+        print(f"Error: {validation_err}", file=sys.stderr)
         return 1
 
     try:
         comp_res = CompilerManager.prepare(raw_path)
         source_path = comp_res.executable_path
         if not comp_res.cached:
-            print(f"  [Compiled] {raw_path.name} -> {source_path.name}")
+            print(
+                f"  {Color.CYAN}[Compiled]{Color.RESET} {raw_path.name} -> {source_path.name}"
+            )
     except CompilationError as e:
-        print(f"\n  [COMPILATION_ERROR]\n{e.message}", file=sys.stderr)
+        print(
+            f"\n  {Color.RED}[COMPILATION_ERROR]{Color.RESET}\n{e.message}",
+            file=sys.stderr,
+        )
         return 1
 
     cases_dir = Path(args.cases)
@@ -117,33 +201,47 @@ def test_command(args: argparse.Namespace) -> int:
         )
         return 1
 
-    print("\n  +-- [Batch Runner] -------------------------------------------+")
+    print(
+        f"\n  {Color.CYAN}+-- [Batch Runner] -------------------------------------------+{Color.RESET}"
+    )
     print(f"  |  Binary : {source_path.name:<48} |")
     print(f"  |  Cases  : {f'{len(cases)} testcases from {cases_dir.name}/':<48} |")
     print(
         f"  |  Limits : {f'{limits.time_limit_ms}ms CPU, {limits.memory_limit_mb}MB RAM':<48} |"
     )
-    print("  +-------------------------------------------------------------+\n")
+    print(
+        f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}\n"
+    )
 
     batch_res = runner.run_batch(source_path, cases_dir, limits, mode=mode)
 
     for res in batch_res.results:
-        badge = f"[{res.verdict}]"
+        verdict_color = Color.GREEN if res.is_accepted else Color.RED
+        badge = f"{verdict_color}[{res.verdict}]{Color.RESET}"
         print(
-            f"  {badge:<24} {res.case_name:<16} {res.cpu_time_ms:>6.1f}ms  {res.peak_memory_mb:>5.1f}MB"
+            f"  {badge:<34} {res.case_name:<16} {res.cpu_time_ms:>6.1f}ms  {res.peak_memory_mb:>5.1f}MB"
         )
         if not res.is_accepted and res.diff:
             for line in res.diff.splitlines():
-                print(f"      {line}")
+                print(f"      {Color.YELLOW}{line}{Color.RESET}")
 
-    summary_status = "ALL PASSED" if batch_res.passed == batch_res.total else "FAILED"
-    print("\n  =============================================================")
+    is_all_passed = batch_res.passed == batch_res.total
+    status_label = (
+        f"{Color.GREEN}ALL PASSED{Color.RESET}"
+        if is_all_passed
+        else f"{Color.RED}FAILED{Color.RESET}"
+    )
     print(
-        f"  Summary: {batch_res.passed}/{batch_res.total} accepted ({summary_status}) "
+        f"\n  {Color.CYAN}============================================================={Color.RESET}"
+    )
+    print(
+        f"  Summary: {batch_res.passed}/{batch_res.total} accepted ({status_label}) "
         f"* {batch_res.total_cpu_time_ms:.1f}ms * {batch_res.max_peak_memory_mb:.1f}MB"
     )
-    print("  =============================================================\n")
-    return 0 if batch_res.passed == batch_res.total else 1
+    print(
+        f"  {Color.CYAN}============================================================={Color.RESET}\n"
+    )
+    return 0 if is_all_passed else 1
 
 
 def doctor_command(_args: argparse.Namespace | None = None) -> int:
@@ -155,23 +253,32 @@ def doctor_command(_args: argparse.Namespace | None = None) -> int:
         else "SubprocessEngine (Universal Zero-Compiler Fallback)"
     )
 
-    print("\n  +-- [System Doctor] ------------------------------------------+")
-    print(f"  |  Aestra Version : v{VERSION:<42} |")
+    print(
+        f"\n  {Color.CYAN}+-- [System Doctor] ------------------------------------------+{Color.RESET}"
+    )
+    print(f"  |  Aestra Version : {Color.BOLD}v{VERSION:<41}{Color.RESET} |")
     print(f"  |  Platform       : {platform.system()} {platform.release():<37} |")
     print(f"  |  Architecture   : {platform.machine():<45} |")
     print(f"  |  Active Engine  : {engine_name:<45} |")
-    print("  +-------------------------------------------------------------+")
+    print(
+        f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}"
+    )
     print("  | Detected Toolchains & Compilers:")
 
     compilers = CompilerManager.detect_compilers()
     for name, path in compilers.items():
-        status = f"Ready ({path})" if path else "Not Found"
+        if path:
+            status = f"{Color.GREEN}Ready ({path}){Color.RESET}"
+        else:
+            status = f"{Color.GRAY}Not Found{Color.RESET}"
         print(f"  |  - {name:<10} : {status}")
 
     cache_dir = CompilerManager.BUILD_DIR
     cache_count = len(list(cache_dir.glob("*.*"))) if cache_dir.is_dir() else 0
     print(f"  |  Build Cache    : {cache_count} binaries in {cache_dir}")
-    print("  +-------------------------------------------------------------+\n")
+    print(
+        f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}\n"
+    )
     return 0
 
 
@@ -183,33 +290,34 @@ def interactive_shell() -> int:
         "Native FFI" if isinstance(engine, NativeEngine) else "Universal Fallback"
     )
     print(
-        f"  Active Sandbox: {engine_type} | Python {platform.python_version()} on {platform.system()}\n"
+        f"  Active Sandbox: {Color.GREEN}{engine_type}{Color.RESET} | Python {platform.python_version()} on {platform.system()}\n"
     )
 
-    menu = """  [1] Run Solution      - Execute source or binary with microsecond telemetry
-  [2] Batch Test Suite  - Test solution against .in / .out cases directory
-  [3] Stress & Fuzz     - Automated randomized fuzzing against edge cases
-  [4] System Doctor     - Inspect system compilers and environment health
-  [5] Clean Cache       - Wipe local compilation artifacts (.aestra/build)
-  [0] Exit              - Quit Aestra
+    menu = f"""  {Color.CYAN}[1]{Color.RESET} {Color.BOLD}Run Solution{Color.RESET}      - Execute source or binary with microsecond telemetry
+  {Color.CYAN}[2]{Color.RESET} {Color.BOLD}Batch Test Suite{Color.RESET}  - Test solution against .in / .out cases directory
+  {Color.CYAN}[3]{Color.RESET} {Color.BOLD}Stress & Fuzz{Color.RESET}     - Automated randomized fuzzing against edge cases
+  {Color.CYAN}[4]{Color.RESET} {Color.BOLD}System Doctor{Color.RESET}     - Inspect system compilers and environment health
+  {Color.CYAN}[5]{Color.RESET} {Color.BOLD}Clean Cache{Color.RESET}       - Wipe local compilation artifacts (.aestra/build)
+  {Color.CYAN}[0]{Color.RESET} {Color.BOLD}Exit{Color.RESET}              - Quit Aestra
 """
 
     while True:
         try:
             print(menu)
-            choice = input("  aestra> ").strip()
+            choice = input(f"  {Color.CYAN}{Color.BOLD}aestra>{Color.RESET} ").strip()
             if not choice:
                 continue
 
             if choice in ("0", "exit", "quit", "q"):
-                print("\n  Exiting Aestra. Happy coding!\n")
+                print(f"\n  {Color.GREEN}Exiting Aestra. Happy coding!{Color.RESET}\n")
                 return 0
 
             elif choice in ("1", "run"):
                 raw_path = input("  Enter target file (e.g. solution.cpp, main.py): ")
                 path = _clean_path_input(raw_path)
-                if not path.exists():
-                    print(f"  [Error] File '{path}' does not exist.\n")
+                validation_err = _validate_source_file(path)
+                if validation_err:
+                    print(f"  {Color.RED}[Error]{Color.RESET} {validation_err}\n")
                     continue
 
                 inp_data = input("  Standard input (press Enter for none): ")
@@ -231,14 +339,17 @@ def interactive_shell() -> int:
             elif choice in ("2", "test"):
                 raw_path = input("  Enter target file (e.g. solution.cpp, main.py): ")
                 path = _clean_path_input(raw_path)
-                if not path.exists():
-                    print(f"  [Error] File '{path}' does not exist.\n")
+                validation_err = _validate_source_file(path)
+                if validation_err:
+                    print(f"  {Color.RED}[Error]{Color.RESET} {validation_err}\n")
                     continue
 
                 raw_cases = input("  Enter testcases directory: ")
                 cases_dir = _clean_path_input(raw_cases)
                 if not cases_dir.is_dir():
-                    print(f"  [Error] Directory '{cases_dir}' does not exist.\n")
+                    print(
+                        f"  {Color.RED}[Error]{Color.RESET} Directory '{cases_dir}' does not exist.\n"
+                    )
                     continue
 
                 mode_str = (
@@ -268,15 +379,18 @@ def interactive_shell() -> int:
             elif choice in ("3", "fuzz"):
                 raw_path = input("  Enter target file to fuzz: ")
                 path = _clean_path_input(raw_path)
-                if not path.exists():
-                    print(f"  [Error] File '{path}' does not exist.\n")
+                validation_err = _validate_source_file(path)
+                if validation_err:
+                    print(f"  {Color.RED}[Error]{Color.RESET} {validation_err}\n")
                     continue
 
                 try:
                     comp_res = CompilerManager.prepare(path)
                     target_exec = comp_res.executable_path
                 except CompilationError as e:
-                    print(f"  [Compilation Error] {e.message}\n")
+                    print(
+                        f"  {Color.RED}[Compilation Error]{Color.RESET} {e.message}\n"
+                    )
                     continue
 
                 iter_str = input("  Number of iterations [default: 50]: ").strip()
@@ -289,12 +403,14 @@ def interactive_shell() -> int:
                 res = fuzzer.run(iterations=iterations)
 
                 if res.found_bug:
-                    print(f"  [BUG DISCOVERED] at iteration {res.iterations_run}!")
+                    print(
+                        f"  {Color.RED}[BUG DISCOVERED]{Color.RESET} at iteration {res.iterations_run}!"
+                    )
                     print(f"  Error: {res.error_message}")
                     print(f"  Failing Input:\n{res.failing_input}")
                 else:
                     print(
-                        f"  [PASS] All {iterations} random stress test iterations passed without crash.\n"
+                        f"  {Color.GREEN}[PASS]{Color.RESET} All {iterations} random stress test iterations passed without crash.\n"
                     )
 
             elif choice in ("4", "doctor"):
@@ -303,23 +419,30 @@ def interactive_shell() -> int:
             elif choice in ("5", "clean"):
                 cleaned = CompilerManager.clean_cache()
                 print(
-                    f"  [Cache Cleaned] Removed {cleaned} binary artifacts from .aestra/build.\n"
+                    f"  {Color.GREEN}[Cache Cleaned]{Color.RESET} Removed {cleaned} binary artifacts from .aestra/build.\n"
                 )
 
             else:
-                # Handle quick inline commands (e.g. `run file.py` or `doctor`)
                 parts = choice.split()
                 cmd = parts[0].lower()
                 if cmd == "doctor":
                     doctor_command()
                 elif cmd == "run" and len(parts) > 1:
                     path = _clean_path_input(parts[1])
+                    val_err = _validate_source_file(path)
+                    if val_err:
+                        print(f"  {Color.RED}[Error]{Color.RESET} {val_err}\n")
+                        continue
                     ns = argparse.Namespace(
                         binary=str(path), input="", time_limit=2000, memory_limit=512
                     )
                     run_command(ns)
                 elif cmd == "test" and len(parts) > 2:
                     bin_p = _clean_path_input(parts[1])
+                    val_err = _validate_source_file(bin_p)
+                    if val_err:
+                        print(f"  {Color.RED}[Error]{Color.RESET} {val_err}\n")
+                        continue
                     cas_p = _clean_path_input(parts[2])
                     ns = argparse.Namespace(
                         binary=str(bin_p),
@@ -331,20 +454,21 @@ def interactive_shell() -> int:
                     test_command(ns)
                 else:
                     print(
-                        f"  [Unknown command] '{choice}'. Enter 0-6 to select an option.\n"
+                        f"  {Color.YELLOW}[Unknown command]{Color.RESET} '{choice}'. Enter 0-5 to select an option.\n"
                     )
 
         except (KeyboardInterrupt, EOFError):
-            print("\n  Session closed.")
+            print(f"\n  {Color.GRAY}Session closed.{Color.RESET}")
             return 0
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    _enable_windows_ansi()
+
     if argv is None:
         argv = sys.argv[1:]
 
-    # When no arguments are provided, launch the interactive window
     if not argv:
         return interactive_shell()
 
@@ -361,7 +485,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
-    # run subcommand
     run_parser = subparsers.add_parser(
         "run", help="Run a binary or source file under hardware resource limits"
     )
@@ -382,7 +505,6 @@ def main(argv: list[str] | None = None) -> int:
         "--input", type=str, default=None, help="Input string to pass via stdin"
     )
 
-    # test subcommand
     test_parser = subparsers.add_parser(
         "test", help="Run batch test cases against a binary or source file"
     )
@@ -411,15 +533,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Memory limit in MB (default: 512)",
     )
 
-    # doctor subcommand
     subparsers.add_parser(
         "doctor", help="Inspect compiler toolchains and sandbox health"
     )
 
-    # interactive subcommand
-    subparsers.add_parser(
-        "interactive", help="Open the interactive AI-like terminal dashboard"
-    )
+    subparsers.add_parser("interactive", help="Open the interactive terminal dashboard")
 
     args = parser.parse_args(argv)
 

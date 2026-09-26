@@ -1,7 +1,7 @@
 <p align="left">
   <img src="assets/aestra.png" width="70" alt="Aestra Logo" align="left" style="margin-right: 15px;">
   <strong><font size="6">Aestra</font></strong><br>
-  <a href="https://github.com/Elitsuv/aestra/releases"><img src="https://img.shields.io/badge/version-v1.0.0-blue.svg" alt="Version"></a>
+  <a href="https://github.com/Elitsuv/aestra/releases"><img src="https://img.shields.io/badge/version-v1.0.1-blue.svg" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://github.com/Elitsuv/aestra/actions/workflows/ci.yml"><img src="https://github.com/Elitsuv/aestra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://elitsuv.github.io/aestra/"><img src="https://img.shields.io/badge/docs-live-cyan.svg" alt="Docs"></a>
@@ -11,35 +11,36 @@
 
 **Aestra** is a deterministic execution sandbox and competitive programming testing engine designed to enforce hardware constraints—CPU time and peak memory limits—with microsecond accuracy.
 
-Built with a low-overhead **Rust POSIX kernel core**, a universal cross-platform fallback, an automated **differential output checker**, multi-language compilation with incremental caching (C++, C, Rust, Go, Python), an extensible **plugin system**, and an interactive terminal CLI.
+Built with a low-overhead microsecond execution engine, a universal Windows fallback using native kernel APIs, an automated **differential output checker**, multi-language compilation with incremental caching (C++, C, Rust, Go, Python), and an interactive terminal CLI.
 
 [Read the Full Documentation & Guides](https://elitsuv.github.io/aestra/)
 
 > [!NOTE]
-> **v1.0.0 Stable Launch (Windows)**: Aestra is built specifically for Windows. **You DO NOT need Rust, MSVC, or any C++ compiler to run Aestra.** Standard Python 3.10+ is all that is required. The universal `SubprocessEngine` directly queries Windows kernel memory via `K32GetProcessMemoryInfo` for microsecond peak RAM and execution tracking with zero host pollution.
+> **v1.0.1 Stable Launch (Windows)**: Aestra is built specifically for Windows. **You DO NOT need Rust, MSVC, or any C++ compiler to run Aestra.** Standard Python 3.10+ is all that is required. The universal `SubprocessEngine` directly queries Windows kernel memory via `K32GetProcessMemoryInfo` for microsecond peak RAM and execution tracking with zero host pollution.
 
 ---
 
-## 1-Click Installation (Windows Only)
+## Fast 1-Click Installation (Windows)
 
-Install Aestra in seconds with the graphical Setup Wizard (**Zero Rust or compilers required**):
+Just like installing Go:
 
-### Method A: Graphical Wizard (Double-Click)
-If you downloaded or extracted Aestra, double-click [`install.bat`](file:///c:/Users/jeezh/OneDrive/Desktop/aestra/aestra/install.bat) in the root folder.
-- Launches a native Windows Setup Wizard window with the branded **Aestra App Icon**
-- Adds `aestra` permanently to your User `PATH` (no admin rights needed)
-- Creates an **Aestra** Desktop shortcut
-- Verifies your environment automatically
+1. **Download Release**: Download `aestra-v1.0.1.zip` from [Releases](https://github.com/Elitsuv/aestra/releases).
+2. **Double-Click Installer**: Extract the folder and double-click [`install.bat`](file:///c:/Users/jeezh/OneDrive/Desktop/aestra/aestra/install.bat).
+   - Automatically unblocks Windows security warnings
+   - Registers `aestra` permanently to your User `PATH` (no administrator privileges needed)
+   - Creates an **Aestra** Desktop shortcut with the high-resolution app icon
+3. **Launch**: Open any terminal (Command Prompt, PowerShell, Windows Terminal) and type:
+   ```cmd
+   aestra
+   ```
 
-### Method B: PowerShell One-Liner
+*Or install in one command via PowerShell:*
 ```powershell
 iex (irm https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.ps1)
 ```
 
-Once installed, open **any** terminal and run:
-```bash
-aestra
-```
+### Clean Uninstallation
+To completely remove Aestra from your system at any time, double-click [`uninstall.bat`](file:///c:/Users/jeezh/OneDrive/Desktop/aestra/aestra/uninstall.bat) or click **Uninstall** inside the Setup Wizard.
 
 ---
 
@@ -49,7 +50,7 @@ When you type `aestra` in your terminal without flags, Aestra opens an interacti
 
 ```text
   +-------------------------------------------------------------+
-  |  AESTRA  *  Deterministic CP Execution Sandbox     v1.0.0  |
+  |  AESTRA  *  Deterministic CP Execution Sandbox     v1.0.1  |
   |  Microsecond telemetry * Multi-language * Zero PC footprint |
   +-------------------------------------------------------------+
 
@@ -100,7 +101,7 @@ Aestra provides a programmatic Python SDK designed for automated testing pipelin
 Import the SDK interfaces directly:
 
 ```python
-from aestra import (
+from src import (
     CheckerMode,
     Config,
     ExecutionStatus,
@@ -122,7 +123,7 @@ The `Judge` class provides single-binary execution and automated batch evaluatio
 Execute a target binary or script once with standard input and inspect CPU and memory telemetry:
 
 ```python
-from aestra import Config, Judge
+from src import Config, Judge
 
 # Initialize judge with custom resource limits
 config = Config(time_limit_ms=1000, memory_limit_mb=256)
@@ -142,7 +143,7 @@ print(f"Output     : {result.stdout.strip()}")
 Evaluate a solution across a directory containing `.in` and `.out` / `.ans` pairs:
 
 ```python
-from aestra import Config, Judge
+from src import Config, Judge
 
 judge = Judge(config=Config(time_limit_ms=2000, memory_limit_mb=512))
 batch = judge.run("solution.py", cases_dir="./testcases")
@@ -159,7 +160,7 @@ for test in batch.results:
 Evaluate test cases defined dynamically in code without creating temporary files:
 
 ```python
-from aestra import Judge, TestCase
+from src import Judge, TestCase
 
 judge = Judge()
 cases = [
@@ -182,7 +183,7 @@ The `Fuzzer` generates randomized inputs to identify edge cases, timeouts, host 
 Stress-test a solution to verify it terminates safely without runtime errors or resource limit breaches:
 
 ```python
-from aestra import Config, Fuzzer
+from src import Config, Fuzzer
 
 fuzzer = Fuzzer(
     target_binary="solution.py",
@@ -203,7 +204,7 @@ else:
 Compare outputs against a trusted reference binary or Python function:
 
 ```python
-from aestra import Fuzzer
+from src import Fuzzer
 
 
 # Trusted reference solution (e.g. brute-force or Python model)
@@ -241,7 +242,7 @@ if report.found_bug:
 When fuzzing uncovers a failure with a large input, `Minimizer` uses hierarchical Delta Debugging (DDmin) across line and token granularities to shrink the input to the smallest reproducible failure:
 
 ```python
-from aestra import Minimizer
+from src import Minimizer
 
 
 def reference_oracle(input_str: str) -> str:
@@ -270,7 +271,7 @@ print(minimal_input)
 Aestra configuration can be defined programmatically or loaded directly from an `aestra.toml` file:
 
 ```python
-from aestra import CheckerMode, Config, Judge
+from src import CheckerMode, Config, Judge
 
 # Programmatic configuration
 config = Config(

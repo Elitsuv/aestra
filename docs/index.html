@@ -201,14 +201,13 @@ install.bat</code></pre>
   </table>
 
   <h2 data-toc>Uninstall</h2>
-  <p>Delete the cloned directory and remove the virtual environment. No system files are modified:</p>
+  <p>To cleanly remove Aestra from your system at any time, double-click <code>uninstall.bat</code> or click <b>Uninstall</b> inside the Setup Wizard:</p>
   <div class="cb">
     <div class="cb-bar">
-      <span class="cb-lang">bash</span>
+      <span class="cb-lang">cmd</span>
       <button class="cb-copy" data-target="c-uninstall"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
     </div>
-    <pre><code id="c-uninstall">deactivate           <span class="cm"># exit the venv</span>
-rm -rf aestra/       <span class="cm"># remove the project directory</span></code></pre>
+    <pre><code id="c-uninstall">uninstall.bat        <span class="cm"># Cleanly removes ~/.aestra, PATH entries, and shortcuts</span></code></pre>
   </div>
 </section>
 
@@ -667,9 +666,11 @@ print(f<span class="str">"CPU Time: {result.cpu_time_ms}ms | Peak RAM: {result.p
 ├── tests/
 │   └── test.py              <span class="cm"># Unified test suite</span>
 ├── install.bat              <span class="cm"># 1-Click Windows Setup Wizard</span>
+├── uninstall.bat            <span class="cm"># 1-Click Windows Clean Uninstaller</span>
 ├── scripts/
 │   ├── wizard.ps1           <span class="cm"># Native Windows GUI installer dialog</span>
-│   └── install.ps1          <span class="cm"># Automated PowerShell installer</span>
+│   ├── install.ps1          <span class="cm"># Automated PowerShell installer</span>
+│   └── uninstall.ps1        <span class="cm"># Clean system uninstaller script</span>
 ├── Cargo.toml               <span class="cm"># Optional Rust extension crate config</span>
 ├── pyproject.toml            <span class="cm"># Python project metadata</span>
 └── .github/
@@ -895,6 +896,22 @@ cargo test --all                                              <span class="cm">#
   <div class="crumb">Community / <b>Changelog</b></div>
   <h1>Changelog</h1>
   <p class="lead">Release notes and version history for Aestra.</p>
+
+  <div class="rel">
+    <div class="rel-head">
+      <span class="rel-tag">v1.0.1 Stable</span>
+      <span class="rel-date">September 2026</span>
+    </div>
+    <p>Windows UX polish, 1-click installer reliability fixes, ANSI colored terminal engine, and clean uninstaller suite.</p>
+    <ul>
+      <li><strong>Win32 Console Virtual Terminal API:</strong> Replaced slow subprocess spawning with native kernel32 virtual terminal mode for vibrant, immediate ANSI colors.</li>
+      <li><strong>Input & Empty File Validation:</strong> Solution paths are now verified before execution; empty or whitespace-only files produce clear colored warnings rather than blank telemetry.</li>
+      <li><strong>Installer Wizard Loop Fix:</strong> Fixed variable scoping in PowerShell WinForms wizard so "Launch Aestra" immediately opens the command terminal instead of repeating installation.</li>
+      <li><strong>Windows Security Warnings Prevented:</strong> Integrated automatic file unblocking in <code>install.bat</code> and PowerShell scripts to eliminate Mark-of-the-Web and SmartScreen warnings.</li>
+      <li><strong>Dedicated Uninstallation Wizard:</strong> Added <code>uninstall.bat</code> and <code>scripts/uninstall.ps1</code> for clean 1-click removal of <code>~/.aestra</code>, PATH entries, and shortcuts.</li>
+      <li><strong>Cropped High-Resolution Emblem:</strong> Removed 106px of black border padding from <code>aestra.png</code> and updated multi-resolution <code>aestra.ico</code>.</li>
+    </ul>
+  </div>
 
   <div class="rel">
     <div class="rel-head">
