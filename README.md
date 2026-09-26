@@ -13,7 +13,7 @@
 
 Built with a low-overhead microsecond execution engine, a universal Windows fallback using native kernel APIs, an automated **differential output checker**, multi-language compilation with incremental caching (C++, C, Rust, Go, Python), and an interactive terminal CLI.
 
-[Read the Full Documentation & Guides](https://elitsuv.github.io/aestra/)
+[Read the Full Documentation & Guides](https://elitsuv.github.io/aestra/) • [Competitive Programmer's Guide](USER_GUIDE.md)
 
 > [!NOTE]
 > **v1.0.1 Stable Launch (Windows)**: Aestra is built specifically for Windows. **You DO NOT need Rust, MSVC, or any C++ compiler to run Aestra.** Standard Python 3.10+ is all that is required. The universal `SubprocessEngine` directly queries Windows kernel memory via `K32GetProcessMemoryInfo` for microsecond peak RAM and execution tracking with zero host pollution.
@@ -63,6 +63,35 @@ When you type `aestra` in your terminal without flags, Aestra opens an interacti
 
   aestra> 
 ```
+
+---
+
+## 📘 Competitive Programmer's Quickstart Guide
+
+> [!TIP]
+> **Keep your files anywhere!** You do not need to save files inside the Aestra folder. Work directly in your usual coding or contest directory (e.g. `Documents\Contest\Problem_A\`). Read the full [User Guide (USER_GUIDE.md)](USER_GUIDE.md) for complete details.
+
+### How to Organize & Test a Contest Problem
+1. **In your contest folder**, create your solution and a `cases/` subfolder:
+   ```text
+   my_contest/
+   ├── solution.cpp          (or solution.py, solution.rs, solution.go)
+   └── cases/
+       ├── 01.in             (Sample input from problem statement)
+       ├── 01.out            (Expected sample output)
+       ├── 02.in
+       └── 02.out
+   ```
+2. **Run the Automated Judge**:
+   ```bash
+   aestra test solution.cpp --cases cases
+   ```
+   *(Aestra automatically compiles C++, Rust, and Go with 0ms SHA-256 caching!)*
+3. **Inspect the Verdicts**:
+   - `[ACCEPTED]` in green: Perfect match, ready to submit!
+   - `[WRONG ANSWER]` in red: Aestra highlights the exact line-by-line diff.
+   - `[TIME LIMIT EXCEEDED]` in yellow: Breached CPU limit (default: 2000ms).
+   - `[MEMORY LIMIT EXCEEDED]` in magenta: Breached RAM limit (default: 512MB).
 
 ---
 

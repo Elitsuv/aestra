@@ -40,6 +40,7 @@
     <ul>
       <li><a href="#overview" class="sl on"><i data-lucide="book-open" stroke-width="1.8"></i>Overview</a></li>
       <li><a href="#installation" class="sl"><i data-lucide="download" stroke-width="1.8"></i>Installation</a></li>
+      <li><a href="#cpguide" class="sl"><i data-lucide="compass" stroke-width="1.8"></i>CP Quickstart</a></li>
       <li><a href="#safety" class="sl"><i data-lucide="shield-check" stroke-width="1.8"></i>Safety</a></li>
       <li><a href="#usecases" class="sl"><i data-lucide="target" stroke-width="1.8"></i>Use cases</a></li>
     </ul>
@@ -212,6 +213,57 @@ install.bat</code></pre>
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CP QUICKSTART GUIDE                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="cpguide" class="pg">
+  <div class="crumb">Getting started / <b>CP Quickstart</b></div>
+  <h1>Competitive Programmer's Quickstart</h1>
+  <p class="lead">Aestra acts as your automated local judge for competitive programming and coding contests. Never manually copy-paste test inputs again.</p>
+
+  <h2 data-toc>1. Where do I keep my code?</h2>
+  <p><strong>Anywhere on your computer!</strong> You never need to save files inside the Aestra folder. Work directly in your usual contest directory:</p>
+
+  <div class="cb">
+    <div class="cb-bar"><span class="cb-lang">file tree</span></div>
+    <pre><code>C:\Users\YourName\Documents\Contest\
+├── solution.cpp             <span class="cm"># Your solution (or .py, .rs, .go)</span>
+└── cases\                   <span class="cm"># Sample test cases folder</span>
+    ├── 01.in                <span class="cm"># Input from problem statement</span>
+    ├── 01.out               <span class="cm"># Expected output</span>
+    ├── 02.in
+    └── 02.out</code></pre>
+  </div>
+
+  <h2 data-toc>2. How to create test cases</h2>
+  <p>For each sample test given in the problem statement, create matching pairs of files in <code>cases/</code>:</p>
+  <ul>
+    <li><code>01.in</code>: Paste the sample input from the problem statement.</li>
+    <li><code>01.out</code>: Paste the expected answer from the problem statement.</li>
+    <li>For test 2: create <code>02.in</code> and <code>02.out</code>, and so on.</li>
+  </ul>
+
+  <h2 data-toc>3. Running the automated judge</h2>
+  <p>Open your terminal in your contest directory and test your solution with a single command:</p>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">bash</span>
+      <button class="cb-copy" data-target="c-cptest"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-cptest">aestra test solution.cpp --cases cases</code></pre>
+  </div>
+  <p style="font-size:13.5px;color:var(--t2);margin-top:8px"><em>Supports <code>.cpp</code>, <code>.py</code>, <code>.rs</code>, <code>.go</code>, or <code>.exe</code>. C++, Rust, and Go are automatically compiled with instant 0ms SHA-256 build caching.</em></p>
+
+  <h2 data-toc>4. Drag-and-drop interactive mode</h2>
+  <p>If you prefer not to type commands, launch the interactive dashboard:</p>
+  <ol style="margin: 8px 0 16px 20px; font-size:14px; color:var(--t2);">
+    <li>Run <code>aestra</code> in any terminal.</li>
+    <li>Press <code>2</code> for <strong>Batch Test Suite</strong>.</li>
+    <li>Drag and drop your <code>solution.cpp</code> file from File Explorer into the terminal window, press Enter.</li>
+    <li>Drag and drop your <code>cases/</code> folder into the terminal window, press Enter.</li>
+  </ol>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
 <!-- SAFETY                                                            -->
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <section id="safety" class="pg">
@@ -281,16 +333,16 @@ install.bat</code></pre>
   <p class="lead">Aestra is engineered for environments where untrusted or user-submitted code must be executed with microsecond-level determinism, strict hardware boundaries, and zero risk to the host system.</p>
 
   <h2 data-toc>Competitive programming judges</h2>
-  <p>Online judge platforms (such as Codeforces, AtCoder, CSES, or internal team training judges) require predictable time and memory accounting across thousands of heterogeneous submissions. Traditional judges rely on wall-clock measurements that fluctuate with server CPU load, causing false <em>Time Limit Exceeded</em> verdicts during traffic spikes.</p>
+  <p>Online judge platforms, contest engines, and internal team training environments require predictable time and memory accounting across thousands of heterogeneous submissions. Traditional judges rely on wall-clock measurements that fluctuate with server CPU load, causing false <em>Time Limit Exceeded</em> verdicts during traffic spikes.</p>
   <p>Aestra solves this by delegating time limits to Linux kernel scheduler accounting:</p>
   <ul>
     <li><strong>Deterministic CPU time:</strong> Measures strictly <code>user_time + kernel_time</code> via the <code>wait4</code> system call with microsecond resolution. Background server operations never inflate submission runtimes.</li>
     <li><strong>Hardware memory ceiling:</strong> Uses <code>RLIMIT_AS</code> to restrict address space. When a submission allocates beyond its quota (e.g. <code>vector&lt;int&gt; a(1e9)</code>), the allocation immediately fails without touching host swap or triggering the OS OOM killer.</li>
-    <li><strong>Sub-millisecond startup:</strong> Uses native <code>fork</code> and <code>execve</code> without the multi-hundred-millisecond latency overhead of Docker container lifecycle management.</li>
+    <li><strong>Sub-millisecond startup:</strong> Uses native <code>fork</code> and <code>execve</code> without the multi-hundred-millisecond latency overhead of container lifecycle management.</li>
   </ul>
 
   <h2 data-toc>Automated academic grading</h2>
-  <p>Computer science university courses and autograding portals (such as Gradescope or automated lab submission runners) frequently run untrusted student code that may contain infinite loops, memory leaks, or accidental system calls.</p>
+  <p>Computer science university courses and autograding portals (such as automated submission runners and evaluation environments) frequently run untrusted student code that may contain infinite loops, memory leaks, or accidental system calls.</p>
   <ul>
     <li><strong>Zero root privilege:</strong> Runs entirely in user space. Student submissions cannot modify system configuration, write outside the designated sandbox, or corrupt other processes.</li>
     <li><strong>Fork bomb protection:</strong> Enforces <code>RLIMIT_NPROC</code> to cap child process creation, preventing malicious or accidental recursive <code>fork()</code> calls from locking the grading server.</li>
@@ -298,7 +350,7 @@ install.bat</code></pre>
   </ul>
 
   <h2 data-toc>Local problem setting & stress testing</h2>
-  <p>Contest problem setters and competitive programmers preparing for ICPC or Codeforces rounds need to stress-test candidate solutions against edge cases before publishing:</p>
+  <p>Contest problem setters and competitive programmers preparing for algorithmic contests need to stress-test candidate solutions against edge cases before publishing:</p>
   <ul>
     <li><strong>Automated test discovery:</strong> Scans test suites matching <code>.in</code> with <code>.out</code> or <code>.ans</code> and executes full batches with aggregated verdicts.</li>
     <li><strong>Diff inspector:</strong> Pinpoints exact token differences between actual program output and expected answers using <code>TOKEN</code> or <code>EXACT</code> mode.</li>
