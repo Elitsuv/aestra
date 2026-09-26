@@ -188,7 +188,7 @@ def test_cli_missing_binary() -> None:
 # 5. SDK TESTS
 # =====================================================================
 def test_sdk_imports_and_exports() -> None:
-    from aestra import Config, Fuzzer, FuzzResult, Judge, Minimizer
+    from src import Config, Fuzzer, FuzzResult, Judge, Minimizer
 
     assert Judge is not None
     assert Fuzzer is not None
@@ -198,7 +198,7 @@ def test_sdk_imports_and_exports() -> None:
 
 
 def test_sdk_config_toml() -> None:
-    from aestra import Config
+    from src import Config
 
     with tempfile.TemporaryDirectory() as tmpdir:
         toml_file = Path(tmpdir) / "aestra.toml"
@@ -224,7 +224,7 @@ mode = "EXACT"
 
 
 def test_sdk_judge_single() -> None:
-    from aestra import Config, Judge
+    from src import Config, Judge
 
     judge = Judge(
         config=Config(time_limit_ms=2000, memory_limit_mb=128),
@@ -236,7 +236,7 @@ def test_sdk_judge_single() -> None:
 
 
 def test_sdk_judge_batch() -> None:
-    from aestra import Judge
+    from src import Judge
 
     mock_engine = MockEngine()
     judge = Judge(engine=mock_engine)
@@ -260,7 +260,7 @@ def test_sdk_judge_batch() -> None:
 
 
 def test_sdk_fuzzer_clean() -> None:
-    from aestra import Fuzzer
+    from src import Fuzzer
 
     with tempfile.TemporaryDirectory() as tmpdir:
         sol = Path(tmpdir) / "sol.py"
@@ -278,7 +278,7 @@ def test_sdk_fuzzer_clean() -> None:
 
 
 def test_sdk_fuzzer_catches_bug() -> None:
-    from aestra import Fuzzer
+    from src import Fuzzer
 
     with tempfile.TemporaryDirectory() as tmpdir:
         sol = Path(tmpdir) / "sol.py"
@@ -298,7 +298,7 @@ def test_sdk_fuzzer_catches_bug() -> None:
 
 
 def test_sdk_minimizer() -> None:
-    from aestra import Minimizer
+    from src import Minimizer
 
     with tempfile.TemporaryDirectory() as tmpdir:
         sol = Path(tmpdir) / "sol.py"
@@ -333,7 +333,7 @@ def test_safety_output_limit_exceeded() -> None:
 
 
 def test_safety_fuzzer_oracle_crash_isolation() -> None:
-    from aestra import Fuzzer
+    from src import Fuzzer
 
     with tempfile.TemporaryDirectory() as tmpdir:
         sol = Path(tmpdir) / "sol.py"
@@ -356,7 +356,7 @@ def test_safety_fuzzer_oracle_crash_isolation() -> None:
 
 
 def test_safety_minimizer_hierarchical_ddmin() -> None:
-    from aestra import Minimizer
+    from src import Minimizer
 
     with tempfile.TemporaryDirectory() as tmpdir:
         sol = Path(tmpdir) / "sol.py"
