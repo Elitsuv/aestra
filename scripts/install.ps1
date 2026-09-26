@@ -68,7 +68,8 @@ if (-not (Test-Path $binDir)) {
 $batContent = "@echo off`r`nset PYTHONPATH=$installDir;%PYTHONPATH%`r`npython -m src.cli %*"
 Set-Content -Path (Join-Path $binDir "aestra.bat") -Value $batContent -Encoding Ascii
 Set-Content -Path (Join-Path $binDir "aestra.cmd") -Value $batContent -Encoding Ascii
-Set-Content -Path (Join-Path $repoRoot "aestra.bat") -Value $batContent -Encoding Ascii
+$localBatContent = "@echo off`r`nset PYTHONPATH=%~dp0;%PYTHONPATH%`r`npython -m src.cli %*"
+Set-Content -Path (Join-Path $repoRoot "aestra.bat") -Value $localBatContent -Encoding Ascii
 
 $pyScriptsDir = Join-Path (Split-Path $pythonCmd.Source) "Scripts"
 if (Test-Path $pyScriptsDir) {
