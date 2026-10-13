@@ -7,7 +7,7 @@ from pathlib import Path
 from src.checker import CheckerMode
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExecutionLimits:
     time_limit_ms: int = 2000
     memory_limit_mb: int = 512
@@ -22,7 +22,7 @@ class ExecutionLimits:
         return self.memory_limit_mb * 1024 * 1024
 
 
-@dataclass
+@dataclass(slots=True)
 class Config:
     time_limit_ms: int = 2000
     memory_limit_mb: int = 512

@@ -9,14 +9,14 @@ from src.engine import BaseEngine, get_engine
 from src.models import ExecutionStatus
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestCase:
     name: str
     input_path: Path
     expected_output_path: Path
 
 
-@dataclass
+@dataclass(slots=True)
 class TestResult:
     case_name: str
     verdict: str
@@ -26,7 +26,7 @@ class TestResult:
     is_accepted: bool = False
 
 
-@dataclass
+@dataclass(slots=True)
 class BatchResult:
     passed: int
     total: int

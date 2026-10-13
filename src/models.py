@@ -18,7 +18,7 @@ class ExecutionStatus(str, Enum):
         return str(self.value)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExecutionResult:
     status: ExecutionStatus
     exit_code: int = 0

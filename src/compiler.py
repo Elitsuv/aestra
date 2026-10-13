@@ -19,7 +19,7 @@ class CompilationError(Exception):
         self.stderr = stderr
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompilationResult:
     """Represents the outcome of a compilation or cache lookup."""
 
@@ -74,15 +74,25 @@ class CompilerManager:
                 cached=True,
             )
 
+        source_hash = cls.get_source_hash(path)
+        out_path = cls._get_output_binary_path(path, source_hash)
+
+        if out_path.exists() and out_path.stat().st_mtime >= path.stat().st_mtime:
+            return CompilationResult(
+                success=True,
+                executable_path=out_path,
+                cached=True,
+            )
+
         suffix = path.suffix.lower()
         if suffix in cls.CPP_EXTENSIONS:
-            return cls._compile_cpp(path)
+            return cls._compile_cpp(path, out_path)
         elif suffix in cls.C_EXTENSIONS:
-            return cls._compile_c(path)
+            return cls._compile_c(path, out_path)
         elif suffix in cls.RUST_EXTENSIONS:
-            return cls._compile_rust(path)
+            return cls._compile_rust(path, out_path)
         elif suffix in cls.GO_EXTENSIONS:
-            return cls._compile_go(path)
+            return cls._compile_go(path, out_path)
 
         raise CompilationError(f"Unsupported source extension: {suffix}")
 
@@ -120,25 +130,13 @@ class CompilerManager:
         return cls.BUILD_DIR / binary_name
 
     @classmethod
-    def _compile_cpp(cls, source_path: Path) -> CompilationResult:
-        source_hash = cls.get_source_hash(source_path)
-        out_path = cls._get_output_binary_path(source_path, source_hash)
-
-        if (
-            out_path.exists()
-            and out_path.stat().st_mtime >= source_path.stat().st_mtime
-        ):
-            return CompilationResult(
-                success=True, executable_path=out_path, cached=True
-            )
-
+    def _compile_cpp(cls, source_path: Path, out_path: Path) -> CompilationResult:
         compiler = shutil.which("g++") or shutil.which("clang++")
         if not compiler:
             raise CompilationError(
                 "Neither 'g++' nor 'clang++' was found on your system PATH. "
                 "Please install a C++ compiler to test .cpp files."
             )
-
         cmd = [
             compiler,
             "-O3",
@@ -151,77 +149,34 @@ class CompilerManager:
         return cls._run_compiler_command(cmd, out_path)
 
     @classmethod
-    def _compile_c(cls, source_path: Path) -> CompilationResult:
-        source_hash = cls.get_source_hash(source_path)
-        out_path = cls._get_output_binary_path(source_path, source_hash)
-
-        if (
-            out_path.exists()
-            and out_path.stat().st_mtime >= source_path.stat().st_mtime
-        ):
-            return CompilationResult(
-                success=True, executable_path=out_path, cached=True
-            )
-
+    def _compile_c(cls, source_path: Path, out_path: Path) -> CompilationResult:
         compiler = shutil.which("gcc") or shutil.which("clang")
         if not compiler:
             raise CompilationError(
                 "Neither 'gcc' nor 'clang' was found on your system PATH."
             )
-
-        cmd = [
-            compiler,
-            "-O3",
-            "-Wall",
-            str(source_path),
-            "-o",
-            str(out_path),
-        ]
+        cmd = [compiler, "-O3", "-Wall", str(source_path), "-o", str(out_path)]
         return cls._run_compiler_command(cmd, out_path)
 
     @classmethod
-    def _compile_rust(cls, source_path: Path) -> CompilationResult:
-        source_hash = cls.get_source_hash(source_path)
-        out_path = cls._get_output_binary_path(source_path, source_hash)
-
-        if (
-            out_path.exists()
-            and out_path.stat().st_mtime >= source_path.stat().st_mtime
-        ):
-            return CompilationResult(
-                success=True, executable_path=out_path, cached=True
-            )
-
+    def _compile_rust(cls, source_path: Path, out_path: Path) -> CompilationResult:
         compiler = shutil.which("rustc")
         if not compiler:
             raise CompilationError(
                 "'rustc' was not found on your system PATH. "
                 "Please install the Rust toolchain (https://rustup.rs) to test .rs files."
             )
-
         cmd = [compiler, "-O", str(source_path), "-o", str(out_path)]
         return cls._run_compiler_command(cmd, out_path)
 
     @classmethod
-    def _compile_go(cls, source_path: Path) -> CompilationResult:
-        source_hash = cls.get_source_hash(source_path)
-        out_path = cls._get_output_binary_path(source_path, source_hash)
-
-        if (
-            out_path.exists()
-            and out_path.stat().st_mtime >= source_path.stat().st_mtime
-        ):
-            return CompilationResult(
-                success=True, executable_path=out_path, cached=True
-            )
-
+    def _compile_go(cls, source_path: Path, out_path: Path) -> CompilationResult:
         compiler = shutil.which("go")
         if not compiler:
             raise CompilationError(
                 "'go' was not found on your system PATH. "
                 "Please install Go (https://go.dev) to test .go files."
             )
-
         cmd = [compiler, "build", "-o", str(out_path), str(source_path)]
         return cls._run_compiler_command(cmd, out_path)
 
