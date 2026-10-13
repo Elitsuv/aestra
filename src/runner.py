@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.checker import CheckerMode, OutputChecker
+from src.checker import BaseChecker, CheckerMode, OutputChecker
 from src.config import ExecutionLimits
 from src.engine import BaseEngine, get_engine
 from src.models import ExecutionStatus
@@ -67,7 +67,7 @@ class BatchRunner:
         source_path: Path,
         case: TestCase,
         limits: ExecutionLimits,
-        checker: OutputChecker,
+        checker: BaseChecker,
     ) -> TestResult:
         """Executes a single testcase and compares output."""
         with open(case.input_path, "r", encoding="utf-8", errors="replace") as f:
@@ -114,10 +114,13 @@ class BatchRunner:
         cases_dir: Path,
         limits: ExecutionLimits,
         mode: CheckerMode = CheckerMode.TOKEN,
+        checker: BaseChecker | None = None,
     ) -> BatchResult:
         """Discovers and runs all testcases in cases_dir, aggregating verdicts."""
         cases = self.discover_test_cases(cases_dir)
-        checker = OutputChecker(mode=mode)
+        active_checker: BaseChecker = (
+            checker if checker is not None else OutputChecker(mode=mode)
+        )
 
         results: list[TestResult] = []
         passed = 0
@@ -126,7 +129,7 @@ class BatchRunner:
         first_failure: str | None = None
 
         for case in cases:
-            res = self.run_case(source_path, case, limits, checker)
+            res = self.run_case(source_path, case, limits, active_checker)
             results.append(res)
             total_cpu += res.cpu_time_ms
             max_ram = max(max_ram, res.peak_memory_mb)

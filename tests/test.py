@@ -5,7 +5,13 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from src.checker import CheckerMode, OutputChecker
+from src.checker import (
+    CallableChecker,
+    CheckerMode,
+    CheckResult,
+    FloatToleranceChecker,
+    OutputChecker,
+)
 from src.cli import main as cli_main
 from src.config import ExecutionLimits
 from src.engine import BaseEngine, MockEngine, SubprocessEngine, get_engine
@@ -74,6 +80,65 @@ def test_checker_ignore_whitespace() -> None:
     checker = OutputChecker(CheckerMode.IGNORE_WHITESPACE)
     result = checker.check("  hello world  \n", "hello world")
     assert result.is_correct is True
+
+
+def test_checker_diff_truncation() -> None:
+    checker = OutputChecker(mode=CheckerMode.EXACT, max_diff_bytes=20)
+    actual = "A" * 100
+    expected = "B" * 100
+    res = checker.check(actual, expected)
+    assert res.is_correct is False
+    assert res.diff is not None
+    assert "[TRUNCATED]" in res.diff
+    assert len(res.diff) < 200
+
+
+def test_float_tolerance_checker_success() -> None:
+    checker = FloatToleranceChecker(epsilon=0.01)
+    res = checker.check("3.1415 2.718", "3.1420 2.710")
+    assert res.is_correct is True
+    assert res.diff is None
+
+
+def test_float_tolerance_checker_failure() -> None:
+    checker = FloatToleranceChecker(epsilon=0.001)
+    res = checker.check("3.1415 2.718", "3.1500 2.718")
+    assert res.is_correct is False
+    assert res.diff is not None
+    assert "outside epsilon" in res.diff
+
+
+def test_float_tolerance_checker_tokens() -> None:
+    checker = FloatToleranceChecker(epsilon=0.01)
+    res_len = checker.check("1.0 2.0", "1.0")
+    assert res_len.is_correct is False
+    assert "Token count mismatch" in (res_len.diff or "")
+
+    res_str_ok = checker.check("1.0 YES", "1.0 YES")
+    assert res_str_ok.is_correct is True
+
+    res_str_fail = checker.check("1.0 NO", "1.0 YES")
+    assert res_str_fail.is_correct is False
+    assert "Token 1 mismatch" in (res_str_fail.diff or "")
+
+
+def test_callable_checker() -> None:
+    bool_checker = CallableChecker(
+        lambda act, exp: act.strip().lower() == exp.strip().lower()
+    )
+    assert bool_checker.check("HELLO", "hello").is_correct is True
+    assert bool_checker.check("WORLD", "hello").is_correct is False
+
+    custom_checker = CallableChecker(
+        lambda act, exp: (
+            CheckResult(is_correct=False, diff="Custom reason")
+            if "bad" in act
+            else CheckResult(is_correct=True)
+        )
+    )
+    assert custom_checker.check("bad input", "any").is_correct is False
+    assert custom_checker.check("bad input", "any").diff == "Custom reason"
+    assert custom_checker.check("good input", "any").is_correct is True
 
 
 # =====================================================================
@@ -188,13 +253,25 @@ def test_cli_missing_binary() -> None:
 # 5. SDK TESTS
 # =====================================================================
 def test_sdk_imports_and_exports() -> None:
-    from src import Config, Fuzzer, FuzzResult, Judge, Minimizer
+    from src import (
+        BaseChecker,
+        CallableChecker,
+        Config,
+        FloatToleranceChecker,
+        Fuzzer,
+        FuzzResult,
+        Judge,
+        Minimizer,
+    )
 
     assert Judge is not None
     assert Fuzzer is not None
     assert Minimizer is not None
     assert Config is not None
     assert FuzzResult is not None
+    assert BaseChecker is not None
+    assert FloatToleranceChecker is not None
+    assert CallableChecker is not None
 
 
 def test_sdk_config_toml() -> None:
@@ -257,6 +334,33 @@ def test_sdk_judge_batch() -> None:
         res_list = judge.run(source_file, test_cases=[case])
         assert res_list.passed == 1
         assert res_list.overall_verdict == "ACCEPTED"
+
+
+def test_sdk_custom_checker_injection() -> None:
+    from src import Judge
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        folder = Path(tmpdir)
+        source_file = folder / "sol.py"
+        source_file.write_text("# STATUS: OK\n", encoding="utf-8")
+        in_file = folder / "01.in"
+        in_file.write_text("in", encoding="utf-8")
+        out_file = folder / "01.out"
+        out_file.write_text("Different output.", encoding="utf-8")
+
+        mock_engine = MockEngine()  # Returns "Simulated output."
+
+        # Default checker fails because "Simulated output." != "Different output."
+        default_judge = Judge(engine=mock_engine)
+        res_def = default_judge.run(source_file, cases_dir=folder)
+        assert res_def.passed == 0
+
+        # Custom checker that always accepts
+        custom_checker = CallableChecker(lambda act, exp: True)
+        custom_judge = Judge(engine=mock_engine, checker=custom_checker)
+        res_custom = custom_judge.run(source_file, cases_dir=folder)
+        assert res_custom.passed == 1
+        assert res_custom.overall_verdict == "ACCEPTED"
 
 
 def test_sdk_fuzzer_clean() -> None:
@@ -437,6 +541,11 @@ ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
     ("Checker Token Mismatch", test_checker_token_mismatch),
     ("Checker Exact Strictness", test_checker_exact_strictness),
     ("Checker Ignore Whitespace", test_checker_ignore_whitespace),
+    ("Checker Diff Truncation", test_checker_diff_truncation),
+    ("Float Checker Success", test_float_tolerance_checker_success),
+    ("Float Checker Failure", test_float_tolerance_checker_failure),
+    ("Float Checker Tokens", test_float_tolerance_checker_tokens),
+    ("Callable Checker", test_callable_checker),
     ("Runner Empty/Missing Dir", test_runner_empty_or_missing),
     ("Runner Case Pairing", test_runner_case_pairing),
     ("Runner Case Verdicts", test_runner_run_case_verdicts),
@@ -448,6 +557,7 @@ ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
     ("SDK Config TOML Parsing", test_sdk_config_toml),
     ("SDK Judge Single Execution", test_sdk_judge_single),
     ("SDK Judge Batch Execution", test_sdk_judge_batch),
+    ("SDK Custom Checker Injection", test_sdk_custom_checker_injection),
     ("SDK Fuzzer Clean Run", test_sdk_fuzzer_clean),
     ("SDK Fuzzer Catches Bug", test_sdk_fuzzer_catches_bug),
     ("SDK Minimizer Delta Debugging", test_sdk_minimizer),

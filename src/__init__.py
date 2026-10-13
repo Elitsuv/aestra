@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from src.checker import CheckerMode, CheckResult, OutputChecker
+from src.checker import (
+    BaseChecker,
+    CallableChecker,
+    CheckerMode,
+    CheckResult,
+    FloatToleranceChecker,
+    OutputChecker,
+)
 from src.compiler import CompilationError, CompilationResult, CompilerManager
 from src.config import Config, ExecutionLimits
 from src.engine import (
@@ -15,9 +22,11 @@ from src.runner import BatchResult, BatchRunner, TestCase, TestResult
 from src.sdk import Fuzzer, FuzzResult, Judge, Minimizer
 
 __all__ = [
+    "BaseChecker",
     "BaseEngine",
     "BatchResult",
     "BatchRunner",
+    "CallableChecker",
     "CheckResult",
     "CheckerMode",
     "CompilationError",
@@ -27,6 +36,7 @@ __all__ = [
     "ExecutionLimits",
     "ExecutionResult",
     "ExecutionStatus",
+    "FloatToleranceChecker",
     "FuzzResult",
     "Fuzzer",
     "Judge",
