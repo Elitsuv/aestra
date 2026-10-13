@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.checker import OutputChecker
+from src.checker import BaseChecker, OutputChecker
 from src.config import Config
 from src.engine import BaseEngine, get_engine
 from src.models import ExecutionResult, ExecutionStatus
@@ -20,6 +20,7 @@ class Judge:
         config: Config | None = None,
         config_path: str | Path | None = None,
         engine: BaseEngine | None = None,
+        checker: BaseChecker | None = None,
     ) -> None:
         if config_path is not None:
             self.config = Config.from_toml(config_path)
@@ -30,6 +31,7 @@ class Judge:
 
         self.engine = engine if engine is not None else get_engine()
         self.runner = BatchRunner(engine=self.engine)
+        self.checker = checker
 
     def run_single(
         self,
@@ -51,15 +53,23 @@ class Judge:
         """Evaluates target_binary across a test suite (directory or TestCase list)."""
         path = Path(target_binary)
         limits = self.config.to_limits()
+        active_checker: BaseChecker = (
+            self.checker
+            if self.checker is not None
+            else OutputChecker(mode=self.config.checker_mode)
+        )
 
         if cases_dir is not None:
             dir_path = Path(cases_dir)
             return self.runner.run_batch(
-                path, dir_path, limits, mode=self.config.checker_mode
+                path,
+                dir_path,
+                limits,
+                mode=self.config.checker_mode,
+                checker=active_checker,
             )
 
         if test_cases is not None:
-            checker = OutputChecker(mode=self.config.checker_mode)
             results: list[TestResult] = []
             passed = 0
             total_cpu = 0.0
@@ -67,7 +77,7 @@ class Judge:
             first_failure: str | None = None
 
             for case in test_cases:
-                res = self.runner.run_case(path, case, limits, checker)
+                res = self.runner.run_case(path, case, limits, active_checker)
                 results.append(res)
                 total_cpu += res.cpu_time_ms
                 max_ram = max(max_ram, res.peak_memory_mb)
@@ -135,6 +145,7 @@ class Fuzzer:
         timeout_ms: int | None = None,
         memory_limit_mb: int | None = None,
         engine: BaseEngine | None = None,
+        checker: BaseChecker | None = None,
     ) -> None:
         self.target_binary = Path(target_binary)
         self.oracle = oracle
@@ -157,7 +168,11 @@ class Fuzzer:
             output_limit_bytes=base_config.output_limit_bytes,
         )
         self.engine = engine if engine is not None else get_engine()
-        self.checker = OutputChecker(mode=self.config.checker_mode)
+        self.checker = (
+            checker
+            if checker is not None
+            else OutputChecker(mode=self.config.checker_mode)
+        )
 
     def _run_oracle(self, input_data: str) -> tuple[str, bool, str | None]:
         if callable(self.oracle):
@@ -243,12 +258,17 @@ class Minimizer:
         oracle: str | Path | Callable[[str], str] | None = None,
         config: Config | None = None,
         engine: BaseEngine | None = None,
+        checker: BaseChecker | None = None,
     ) -> None:
         self.target_binary = Path(target_binary)
         self.oracle = oracle
         self.config = config if config is not None else Config()
         self.engine = engine if engine is not None else get_engine()
-        self.checker = OutputChecker(mode=self.config.checker_mode)
+        self.checker = (
+            checker
+            if checker is not None
+            else OutputChecker(mode=self.config.checker_mode)
+        )
 
     def _is_failing(self, input_data: str) -> bool:
         limits = self.config.to_limits()
