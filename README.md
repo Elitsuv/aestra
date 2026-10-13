@@ -87,6 +87,11 @@ When you type `aestra` in your terminal without flags, Aestra opens an interacti
    aestra test solution.cpp --cases cases
    ```
    *(Aestra automatically compiles C++, Rust, and Go with 0ms SHA-256 caching!)*
+
+   *Or try the built-in demo in `examples/quickstart`:*
+   ```bash
+   aestra test examples/quickstart/solution.py --cases examples/quickstart/cases
+   ```
 3. **Inspect the Verdicts**:
    - `[ACCEPTED]` in green: Perfect match, ready to submit!
    - `[WRONG ANSWER]` in red: Aestra highlights the exact line-by-line diff.

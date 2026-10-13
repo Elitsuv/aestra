@@ -88,28 +88,9 @@ class NativeEngine(BaseEngine):
             stderr_str = str(telemetry.get("stderr", ""))
             err_msg = telemetry.get("error_message")
 
-            if limits.output_limit_bytes > 0:
-                stdout_b = stdout_str.encode("utf-8", errors="replace")
-                if len(stdout_b) > limits.output_limit_bytes:
-                    status = ExecutionStatus.OUTPUT_LIMIT_EXCEEDED
-                    err_msg = (
-                        f"Output limit exceeded ({limits.output_limit_bytes} bytes)"
-                    )
-                    stdout_str = (
-                        stdout_b[: limits.output_limit_bytes].decode(
-                            "utf-8", errors="ignore"
-                        )
-                        + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
-                    )
-
-                stderr_b = stderr_str.encode("utf-8", errors="replace")
-                if len(stderr_b) > limits.output_limit_bytes:
-                    stderr_str = (
-                        stderr_b[: limits.output_limit_bytes].decode(
-                            "utf-8", errors="ignore"
-                        )
-                        + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
-                    )
+            stdout_str, stderr_str, status, err_msg = _enforce_output_limits(
+                stdout_str, stderr_str, limits.output_limit_bytes, status, err_msg
+            )
 
             return ExecutionResult(
                 status=status,
@@ -134,6 +115,35 @@ class NativeEngine(BaseEngine):
                 exit_code=1,
                 error_message=f"Native execution crash: {e}",
             )
+
+
+def _enforce_output_limits(
+    stdout_str: str,
+    stderr_str: str,
+    limit_bytes: int,
+    status: ExecutionStatus,
+    err_msg: str | None = None,
+) -> tuple[str, str, ExecutionStatus, str | None]:
+    if limit_bytes <= 0:
+        return stdout_str, stderr_str, status, err_msg
+
+    stdout_b = stdout_str.encode("utf-8", errors="replace")
+    if len(stdout_b) > limit_bytes:
+        status = ExecutionStatus.OUTPUT_LIMIT_EXCEEDED
+        err_msg = f"Output limit exceeded ({limit_bytes} bytes)"
+        stdout_str = (
+            stdout_b[:limit_bytes].decode("utf-8", errors="ignore")
+            + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
+        )
+
+    stderr_b = stderr_str.encode("utf-8", errors="replace")
+    if len(stderr_b) > limit_bytes:
+        stderr_str = (
+            stderr_b[:limit_bytes].decode("utf-8", errors="ignore")
+            + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
+        )
+
+    return stdout_str, stderr_str, status, err_msg
 
 
 def _measure_windows_peak_memory(proc_handle: int) -> int:
@@ -241,28 +251,9 @@ class SubprocessEngine(BaseEngine):
                 status = ExecutionStatus.MEMORY_LIMIT_EXCEEDED
 
             err_msg: str | None = None
-            if limits.output_limit_bytes > 0:
-                stdout_b = stdout_str.encode("utf-8", errors="replace")
-                if len(stdout_b) > limits.output_limit_bytes:
-                    status = ExecutionStatus.OUTPUT_LIMIT_EXCEEDED
-                    err_msg = (
-                        f"Output limit exceeded ({limits.output_limit_bytes} bytes)"
-                    )
-                    stdout_str = (
-                        stdout_b[: limits.output_limit_bytes].decode(
-                            "utf-8", errors="ignore"
-                        )
-                        + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
-                    )
-
-                stderr_b = stderr_str.encode("utf-8", errors="replace")
-                if len(stderr_b) > limits.output_limit_bytes:
-                    stderr_str = (
-                        stderr_b[: limits.output_limit_bytes].decode(
-                            "utf-8", errors="ignore"
-                        )
-                        + "\n[TRUNCATED - OUTPUT LIMIT EXCEEDED]"
-                    )
+            stdout_str, stderr_str, status, err_msg = _enforce_output_limits(
+                stdout_str, stderr_str, limits.output_limit_bytes, status, err_msg
+            )
 
             return ExecutionResult(
                 status=status,

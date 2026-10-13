@@ -31,3 +31,6 @@ wheels/
 Thumbs.db
 .vscode/
 .idea/
+
+# Aestra Build & Cache
+.aestra/

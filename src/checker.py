@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import abc
+import itertools
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
-_DEFAULT_MAX_DIFF_BYTES: int = 4096
+_DEFAULT_MAX_DIFF: int = 4096
+_TOKEN_RE = re.compile(r"\S+")
 
 
 class CheckerMode(str, Enum):
@@ -14,105 +17,87 @@ class CheckerMode(str, Enum):
     IGNORE_WHITESPACE = "IGNORE_WHITESPACE"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CheckResult:
-    """Immutable verdict result of an output evaluation."""
-
     is_correct: bool
     diff: str | None = None
 
 
 class BaseChecker(abc.ABC):
-    """Abstract interface defining the output validation contract."""
-
     @abc.abstractmethod
     def check(self, actual: str, expected: str) -> CheckResult:
-        """Evaluate program output against expected output."""
+        ...
 
 
 class OutputChecker(BaseChecker):
-    """Standard multi-mode output checker supporting EXACT, TOKEN, and IGNORE_WHITESPACE."""
+    __slots__ = ("max_diff", "mode")
 
     def __init__(
         self,
         mode: CheckerMode = CheckerMode.TOKEN,
-        max_diff_bytes: int = _DEFAULT_MAX_DIFF_BYTES,
+        max_diff_bytes: int = _DEFAULT_MAX_DIFF,
     ) -> None:
         self.mode = mode
-        self.max_diff_bytes = max_diff_bytes
+        self.max_diff = max_diff_bytes
 
     def check(self, actual: str, expected: str) -> CheckResult:
-        if self.mode == CheckerMode.EXACT:
-            is_match = actual == expected
-        elif self.mode == CheckerMode.IGNORE_WHITESPACE:
-            is_match = actual.strip() == expected.strip()
-        elif self.mode == CheckerMode.TOKEN:
-            is_match = actual.split() == expected.split()
-        else:
-            raise ValueError(f"Unsupported CheckerMode: {self.mode}")
+        match self.mode:
+            case CheckerMode.EXACT:
+                matched = actual == expected
+            case CheckerMode.IGNORE_WHITESPACE:
+                matched = actual.strip() == expected.strip()
+            case CheckerMode.TOKEN:
+                sentinel = object()
+                it_a = (m.group() for m in _TOKEN_RE.finditer(actual))
+                it_e = (m.group() for m in _TOKEN_RE.finditer(expected))
+                matched = all(a == e for a, e in itertools.zip_longest(it_a, it_e, fillvalue=sentinel))
+            case _:
+                raise ValueError(f"Unsupported CheckerMode: {self.mode}")
 
-        if is_match:
-            return CheckResult(is_correct=True)
+        return CheckResult(True) if matched else CheckResult(False, self._diff(actual, expected))
 
-        return CheckResult(is_correct=False, diff=self._build_diff(actual, expected))
-
-    def _build_diff(self, actual: str, expected: str) -> str:
-        exp_clean = expected.strip()
-        act_clean = actual.strip()
-
-        if len(exp_clean) > self.max_diff_bytes:
-            exp_clean = f"{exp_clean[: self.max_diff_bytes]}... [TRUNCATED]"
-        if len(act_clean) > self.max_diff_bytes:
-            act_clean = f"{act_clean[: self.max_diff_bytes]}... [TRUNCATED]"
-
-        return f"Expected:\n{exp_clean}\n\nActual:\n{act_clean}"
+    def _diff(self, actual: str, expected: str) -> str:
+        exp, act = expected.strip(), actual.strip()
+        if len(exp) > self.max_diff:
+            exp = f"{exp[: self.max_diff]}... [TRUNCATED]"
+        if len(act) > self.max_diff:
+            act = f"{act[: self.max_diff]}... [TRUNCATED]"
+        return f"Expected:\n{exp}\n\nActual:\n{act}"
 
 
 class FloatToleranceChecker(BaseChecker):
-    """Validates numerical output within an absolute or relative epsilon tolerance."""
+    __slots__ = ("epsilon",)
 
     def __init__(self, epsilon: float = 1e-4) -> None:
         self.epsilon = epsilon
 
     def check(self, actual: str, expected: str) -> CheckResult:
-        act_tokens = actual.split()
-        exp_tokens = expected.split()
+        it_a = (m.group() for m in _TOKEN_RE.finditer(actual))
+        it_e = (m.group() for m in _TOKEN_RE.finditer(expected))
+        sentinel = object()
 
-        if len(act_tokens) != len(exp_tokens):
-            return CheckResult(
-                is_correct=False,
-                diff=f"Token count mismatch: Expected {len(exp_tokens)}, got {len(act_tokens)}",
-            )
-
-        for idx, (a, e) in enumerate(zip(act_tokens, exp_tokens, strict=True)):
+        for idx, (a, e) in enumerate(itertools.zip_longest(it_a, it_e, fillvalue=sentinel)):
+            if a is sentinel or e is sentinel:
+                return CheckResult(False, f"Token count mismatch at index {idx}")
             try:
-                a_val = float(a)
-                e_val = float(e)
+                if abs(float(a) - float(e)) > self.epsilon:
+                    return CheckResult(
+                        False,
+                        f"Token {idx} outside epsilon {self.epsilon}: Expected {e}, got {a}",
+                    )
             except ValueError:
                 if a != e:
-                    return CheckResult(
-                        is_correct=False,
-                        diff=f"Token {idx} mismatch: Expected '{e}', got '{a}'",
-                    )
-                continue
+                    return CheckResult(False, f"Token {idx} mismatch: Expected '{e}', got '{a}'")
 
-            if abs(a_val - e_val) > self.epsilon:
-                return CheckResult(
-                    is_correct=False,
-                    diff=f"Token {idx} outside epsilon {self.epsilon}: Expected {e_val}, got {a_val}",
-                )
-
-        return CheckResult(is_correct=True)
+        return CheckResult(True)
 
 
 class CallableChecker(BaseChecker):
-    """Wraps an arbitrary predicate or function for ad-hoc validation."""
+    __slots__ = ("_fn",)
 
     def __init__(self, fn: Callable[[str, str], bool | CheckResult]) -> None:
         self._fn = fn
 
     def check(self, actual: str, expected: str) -> CheckResult:
         res = self._fn(actual, expected)
-        if isinstance(res, CheckResult):
-            return res
-        return CheckResult(is_correct=bool(res))
+        return res if isinstance(res, CheckResult) else CheckResult(bool(res))
