@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import itertools
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -77,15 +78,16 @@ class FloatToleranceChecker(BaseChecker):
         sentinel = object()
 
         for idx, (a, e) in enumerate(itertools.zip_longest(it_a, it_e, fillvalue=sentinel)):
-            if a is sentinel or e is sentinel:
+            if not isinstance(a, str) or not isinstance(e, str):
                 return CheckResult(False, f"Token count mismatch at index {idx}")
             try:
-                if abs(float(a) - float(e)) > self.epsilon:
+                a_val, e_val = float(a), float(e)
+                if math.isnan(a_val) or math.isnan(e_val) or abs(a_val - e_val) > self.epsilon:
                     return CheckResult(
                         False,
                         f"Token {idx} outside epsilon {self.epsilon}: Expected {e}, got {a}",
                     )
-            except ValueError:
+            except (ValueError, OverflowError):
                 if a != e:
                     return CheckResult(False, f"Token {idx} mismatch: Expected '{e}', got '{a}'")
 
