@@ -137,14 +137,24 @@ class CompilerManager:
                 "Neither 'g++' nor 'clang++' was found on your system PATH. "
                 "Please install a C++ compiler to test .cpp files."
             )
-        cmd = [compiler, "-O3", "-std=c++20", "-Wall", str(source_path), "-o", str(out_path)]
+        cmd = [
+            compiler,
+            "-O3",
+            "-std=c++20",
+            "-Wall",
+            str(source_path),
+            "-o",
+            str(out_path),
+        ]
         return cls._run_compiler_command(cmd, out_path)
 
     @classmethod
     def _compile_c(cls, source_path: Path, out_path: Path) -> CompilationResult:
         compiler = shutil.which("gcc") or shutil.which("clang")
         if not compiler:
-            raise CompilationError("Neither 'gcc' nor 'clang' was found on your system PATH.")
+            raise CompilationError(
+                "Neither 'gcc' nor 'clang' was found on your system PATH."
+            )
         cmd = [compiler, "-O3", "-Wall", str(source_path), "-o", str(out_path)]
         return cls._run_compiler_command(cmd, out_path)
 

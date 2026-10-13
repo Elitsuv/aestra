@@ -26,8 +26,7 @@ class CheckResult:
 
 class BaseChecker(abc.ABC):
     @abc.abstractmethod
-    def check(self, actual: str, expected: str) -> CheckResult:
-        ...
+    def check(self, actual: str, expected: str) -> CheckResult: ...
 
 
 class OutputChecker(BaseChecker):
@@ -51,11 +50,18 @@ class OutputChecker(BaseChecker):
                 sentinel = object()
                 it_a = (m.group() for m in _TOKEN_RE.finditer(actual))
                 it_e = (m.group() for m in _TOKEN_RE.finditer(expected))
-                matched = all(a == e for a, e in itertools.zip_longest(it_a, it_e, fillvalue=sentinel))
+                matched = all(
+                    a == e
+                    for a, e in itertools.zip_longest(it_a, it_e, fillvalue=sentinel)
+                )
             case _:
                 raise ValueError(f"Unsupported CheckerMode: {self.mode}")
 
-        return CheckResult(True) if matched else CheckResult(False, self._diff(actual, expected))
+        return (
+            CheckResult(True)
+            if matched
+            else CheckResult(False, self._diff(actual, expected))
+        )
 
     def _diff(self, actual: str, expected: str) -> str:
         exp, act = expected.strip(), actual.strip()
@@ -77,19 +83,27 @@ class FloatToleranceChecker(BaseChecker):
         it_e = (m.group() for m in _TOKEN_RE.finditer(expected))
         sentinel = object()
 
-        for idx, (a, e) in enumerate(itertools.zip_longest(it_a, it_e, fillvalue=sentinel)):
+        for idx, (a, e) in enumerate(
+            itertools.zip_longest(it_a, it_e, fillvalue=sentinel)
+        ):
             if not isinstance(a, str) or not isinstance(e, str):
                 return CheckResult(False, f"Token count mismatch at index {idx}")
             try:
                 a_val, e_val = float(a), float(e)
-                if math.isnan(a_val) or math.isnan(e_val) or abs(a_val - e_val) > self.epsilon:
+                if (
+                    math.isnan(a_val)
+                    or math.isnan(e_val)
+                    or abs(a_val - e_val) > self.epsilon
+                ):
                     return CheckResult(
                         False,
                         f"Token {idx} outside epsilon {self.epsilon}: Expected {e}, got {a}",
                     )
             except (ValueError, OverflowError):
                 if a != e:
-                    return CheckResult(False, f"Token {idx} mismatch: Expected '{e}', got '{a}'")
+                    return CheckResult(
+                        False, f"Token {idx} mismatch: Expected '{e}', got '{a}'"
+                    )
 
         return CheckResult(True)
 
