@@ -12,7 +12,7 @@ from src.engine import NativeEngine, get_engine
 from src.runner import BatchRunner
 from src.sdk import Fuzzer
 
-VERSION = "1.0.1"
+VERSION = "1.1.0"
 
 
 def _enable_windows_ansi() -> None:
