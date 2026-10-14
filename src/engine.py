@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import contextlib
+import os
 import subprocess
 import sys
 import time
@@ -200,6 +201,82 @@ def _measure_posix_peak_memory() -> int:
     return 0
 
 
+_SENSITIVE_ENV_PATTERNS: frozenset[str] = frozenset(
+    {
+        "KEY",
+        "TOKEN",
+        "SECRET",
+        "AUTH",
+        "PASS",
+        "CREDENTIAL",
+        "PRIVATE",
+    }
+)
+
+_SAFE_ENV_ALLOWLIST: frozenset[str] = frozenset(
+    {
+        "PATH",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "WINDIR",
+        "COMSPEC",
+        "TEMP",
+        "TMP",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "TERM",
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "PYTHONIOENCODING",
+        "PYTHONUTF8",
+        "LD_LIBRARY_PATH",
+        "DYLD_LIBRARY_PATH",
+    }
+)
+
+
+def get_sanitized_environment(
+    base_env: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Builds a secure, sanitized environment for untrusted subprocess execution, stripping secrets."""
+    source = os.environ if base_env is None else base_env
+    sanitized: dict[str, str] = {}
+    for k, v in source.items():
+        k_upper = k.upper()
+        if any(pat in k_upper for pat in _SENSITIVE_ENV_PATTERNS):
+            continue
+        if k_upper in _SAFE_ENV_ALLOWLIST or not any(
+            s in k_upper for s in ("SECRET", "TOKEN", "KEY", "AUTH", "PASS")
+        ):
+            sanitized[k] = v
+    return sanitized
+
+
+def _kill_process_tree(proc: subprocess.Popen[Any] | None) -> None:
+    """Terminates a process and all its descendants to prevent orphan process leaks."""
+    if proc is None:
+        return
+    with contextlib.suppress(Exception):
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+        else:
+            import signal
+
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    with contextlib.suppress(Exception):
+        proc.kill()
+
+
 class SubprocessEngine(BaseEngine):
     def execute(
         self,
@@ -218,13 +295,17 @@ class SubprocessEngine(BaseEngine):
         start_time = time.perf_counter()
         proc: subprocess.Popen[str] | None = None
         try:
-            proc = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
+            popen_kwargs: dict[str, Any] = {
+                "stdin": subprocess.PIPE,
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
+                "text": True,
+                "env": get_sanitized_environment(),
+            }
+            if sys.platform != "win32":
+                popen_kwargs["start_new_session"] = True
+
+            proc = subprocess.Popen(cmd, **popen_kwargs)
             proc_handle_raw = getattr(proc, "_handle", None)
             proc_handle: int | None = (
                 int(proc_handle_raw) if proc_handle_raw is not None else None
@@ -265,14 +346,10 @@ class SubprocessEngine(BaseEngine):
                 error_message=err_msg,
             )
         except subprocess.TimeoutExpired:
-            if proc is not None:
-                with contextlib.suppress(Exception):
-                    proc.kill()
-                try:
-                    out, err = proc.communicate()
-                except Exception:  # noqa: BLE001
-                    out, err = "", ""
-            else:
+            _kill_process_tree(proc)
+            try:
+                out, err = proc.communicate() if proc is not None else ("", "")
+            except Exception:  # noqa: BLE001
                 out, err = "", ""
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             return ExecutionResult(
@@ -285,15 +362,13 @@ class SubprocessEngine(BaseEngine):
                 error_message=f"Time limit exceeded ({limits.time_limit_ms}ms)",
             )
         except Exception as e:  # noqa: BLE001
-            if proc is not None:
-                with contextlib.suppress(Exception):
-                    proc.kill()
+            _kill_process_tree(proc)
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             return ExecutionResult(
                 status=ExecutionStatus.INTERNAL_ERROR,
                 stdout="",
                 stderr=str(e),
-                exit_code=1,
+                exit_code=-1,
                 cpu_time_ms=elapsed_ms,
                 peak_memory_bytes=0,
                 error_message=str(e),

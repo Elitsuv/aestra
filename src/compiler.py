@@ -62,7 +62,13 @@ class CompilerManager:
     @classmethod
     def prepare(cls, target_path: str | Path) -> CompilationResult:
         """Resolves target_path to an executable binary, compiling source files if necessary."""
-        path = Path(target_path).resolve()
+        target_p = Path(target_path)
+        if target_p.name.startswith("-"):
+            raise ValueError(
+                f"Security: Target filename '{target_p.name}' cannot start with a leading dash."
+            )
+
+        path = target_p.resolve()
 
         if not path.exists():
             raise FileNotFoundError(f"Target file '{path}' does not exist.")
@@ -142,9 +148,10 @@ class CompilerManager:
             "-O3",
             "-std=c++20",
             "-Wall",
-            str(source_path),
             "-o",
             str(out_path),
+            "--",
+            str(source_path),
         ]
         return cls._run_compiler_command(cmd, out_path)
 
@@ -155,7 +162,15 @@ class CompilerManager:
             raise CompilationError(
                 "Neither 'gcc' nor 'clang' was found on your system PATH."
             )
-        cmd = [compiler, "-O3", "-Wall", str(source_path), "-o", str(out_path)]
+        cmd = [
+            compiler,
+            "-O3",
+            "-Wall",
+            "-o",
+            str(out_path),
+            "--",
+            str(source_path),
+        ]
         return cls._run_compiler_command(cmd, out_path)
 
     @classmethod
@@ -166,7 +181,7 @@ class CompilerManager:
                 "'rustc' was not found on your system PATH. "
                 "Please install the Rust toolchain (https://rustup.rs) to test .rs files."
             )
-        cmd = [compiler, "-O", str(source_path), "-o", str(out_path)]
+        cmd = [compiler, "-O", "-o", str(out_path), "--", str(source_path)]
         return cls._run_compiler_command(cmd, out_path)
 
     @classmethod

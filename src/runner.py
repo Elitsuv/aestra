@@ -45,14 +45,29 @@ class BatchRunner:
         if not directory.is_dir():
             return []
 
+        resolved_dir = directory.resolve()
         cases: list[TestCase] = []
         for in_file in sorted(directory.glob("*.in")):
+            try:
+                resolved_in = in_file.resolve()
+                if not resolved_in.is_relative_to(resolved_dir):
+                    continue
+            except (ValueError, RuntimeError):
+                continue
+
             base_name = in_file.stem
             out_file = directory / f"{base_name}.out"
             if not out_file.exists():
                 out_file = directory / f"{base_name}.ans"
 
             if out_file.exists():
+                try:
+                    resolved_out = out_file.resolve()
+                    if not resolved_out.is_relative_to(resolved_dir):
+                        continue
+                except (ValueError, RuntimeError):
+                    continue
+
                 cases.append(
                     TestCase(
                         name=in_file.name,

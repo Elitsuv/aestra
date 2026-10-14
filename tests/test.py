@@ -530,6 +530,67 @@ def test_compiler_clean_cache() -> None:
     assert not dummy_file.exists()
 
 
+def test_security_sanitized_environment() -> None:
+    import os
+
+    from src.engine import get_sanitized_environment
+
+    os.environ["MOCK_ACCESS_KEY"] = "leak_me"
+    os.environ["MOCK_AUTH_TOKEN"] = "token_123"
+    os.environ["MOCK_DATABASE_PASSWORD"] = "pass_secret"
+
+    try:
+        clean_env = get_sanitized_environment()
+        assert "MOCK_ACCESS_KEY" not in clean_env
+        assert "MOCK_AUTH_TOKEN" not in clean_env
+        assert "MOCK_DATABASE_PASSWORD" not in clean_env
+        assert "PATH" in clean_env
+    finally:
+        os.environ.pop("MOCK_ACCESS_KEY", None)
+        os.environ.pop("MOCK_AUTH_TOKEN", None)
+        os.environ.pop("MOCK_DATABASE_PASSWORD", None)
+
+
+def test_security_compiler_flag_injection() -> None:
+    from src.compiler import CompilerManager
+
+    try:
+        CompilerManager.prepare("-fplugin=malicious.cpp")
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "leading dash" in str(e)
+
+
+def test_security_runner_symlink_defense() -> None:
+    runner = BatchRunner()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cases_dir = Path(tmpdir) / "cases"
+        cases_dir.mkdir()
+        outside_file = Path(tmpdir) / "secret.in"
+        outside_file.write_text("outside data", encoding="utf-8")
+
+        in1 = cases_dir / "01.in"
+        out1 = cases_dir / "01.out"
+        in1.write_text("inside", encoding="utf-8")
+        out1.write_text("inside", encoding="utf-8")
+
+        symlink_created = False
+        try:
+            symlink_in = cases_dir / "02.in"
+            symlink_in.symlink_to(outside_file)
+            symlink_out = cases_dir / "02.out"
+            symlink_out.write_text("outside", encoding="utf-8")
+            symlink_created = True
+        except (OSError, NotImplementedError):
+            pass
+
+        cases = runner.discover_test_cases(cases_dir)
+        case_names = [c.name for c in cases]
+        assert "01.in" in case_names
+        if symlink_created:
+            assert "02.in" not in case_names
+
+
 # =====================================================================
 # MAIN RUNNER
 # =====================================================================
@@ -581,6 +642,18 @@ ALL_TESTS: list[tuple[str, Callable[[], None]]] = [
     (
         "Compiler Manager Clean Cache",
         test_compiler_clean_cache,
+    ),
+    (
+        "Security Environment Sanitization",
+        test_security_sanitized_environment,
+    ),
+    (
+        "Security Compiler Flag Injection Defense",
+        test_security_compiler_flag_injection,
+    ),
+    (
+        "Security Runner Symlink Defense",
+        test_security_runner_symlink_defense,
     ),
 ]
 
