@@ -82,6 +82,23 @@
       </Component>
     </StandardDirectory>
 
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcutComponent" Guid="E6F7A8B9-7890-1234-5ABC-DEF012345684">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="Aestra"
+                  Description="Aestra - Deterministic CP Execution Sandbox"
+                  Target="[INSTALLFOLDER]aestra.bat"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AestraIcon" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\Aestra"
+                       Name="StartMenuShortcut"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
     <Feature Id="MainFeature" Title="Aestra Core" Level="1">
       <ComponentRef Id="MainExecutable" />
       <ComponentRef Id="PyprojectToml" />
@@ -90,7 +107,7 @@
       <ComponentRef Id="SrcInit" />
       <ComponentRef Id="SrcCoreFiles" />
       <ComponentRef Id="DesktopShortcutComponent" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
     </Feature>
   </Package>
 </Wix>
-
