@@ -5,8 +5,32 @@ build-backend = "maturin"
 [project]
 name = "aestra"
 version = "1.1.0"
-description = "A hybrid competitive programming execution sandbox."
+description = "Deterministic local judge, concurrent fuzzer, and test-case minimizer with microsecond kernel telemetry."
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.10"
+keywords = [
+    "rust",
+    "sandbox",
+    "competitive-programming",
+    "telemetry",
+    "judge",
+    "systems",
+    "fuzzer"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Testing",
+]
 
 [project.scripts]
 aestra = "src.cli:main"
@@ -20,6 +44,7 @@ dev = [
 
 [tool.maturin]
 module-name = "aestra_core"
+manifest-path = "Cargo.toml"
 features = ["pyo3/extension-module"]
 
 [tool.ruff]
@@ -36,3 +61,4 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["tests"]

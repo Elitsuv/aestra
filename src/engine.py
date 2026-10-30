@@ -14,6 +14,8 @@ from src.models import ExecutionResult, ExecutionStatus
 
 
 class BaseEngine(abc.ABC):
+    """Abstract execution engine interface."""
+
     @abc.abstractmethod
     def execute(
         self,
@@ -22,10 +24,12 @@ class BaseEngine(abc.ABC):
         input_data: str = "",
         args: list[str] | None = None,
     ) -> ExecutionResult:
-        """Executes the source file strictly within the provided hardware limits."""
+        """Executes a target binary strictly within configured hardware limits."""
 
 
 class MockEngine(BaseEngine):
+    """Deterministic in-memory mock engine for testing and validation harnesses."""
+
     def execute(
         self,
         source_path: Path,
@@ -36,7 +40,7 @@ class MockEngine(BaseEngine):
         status = ExecutionStatus.OK
 
         try:
-            with open(source_path, "r") as f:
+            with open(source_path, "r", encoding="utf-8", errors="replace") as f:
                 first_line = f.readline().strip()
                 if first_line.startswith("# STATUS: "):
                     raw_status = first_line.split("# STATUS: ")[1].strip()
@@ -58,7 +62,18 @@ class MockEngine(BaseEngine):
 
 
 class NativeEngine(BaseEngine):
-    """Native execution engine using Rust aestra_core PyO3 FFI bridge."""
+    """Native POSIX execution engine using the Rust PyO3 FFI bridge."""
+
+    @classmethod
+    def is_available(cls) -> bool:
+        if sys.platform == "win32":
+            return False
+        try:
+            import aestra_core  # noqa: F401
+
+            return True
+        except ImportError:
+            return False
 
     def execute(
         self,
@@ -67,6 +82,14 @@ class NativeEngine(BaseEngine):
         input_data: str = "",
         args: list[str] | None = None,
     ) -> ExecutionResult:
+        if not self.is_available():
+            return ExecutionResult(
+                status=ExecutionStatus.INTERNAL_ERROR,
+                stderr="Native engine is only available on supported POSIX platforms with compiled aestra_core.",
+                exit_code=1,
+                error_message="Native extension 'aestra_core' is not available",
+            )
+
         try:
             import aestra_core
 
@@ -101,13 +124,6 @@ class NativeEngine(BaseEngine):
                 stdout=stdout_str,
                 stderr=stderr_str,
                 error_message=err_msg,
-            )
-        except ImportError:
-            return ExecutionResult(
-                status=ExecutionStatus.INTERNAL_ERROR,
-                stderr="Native extension 'aestra_core' is not installed.",
-                exit_code=1,
-                error_message="aestra_core import failed",
             )
         except Exception as e:  # noqa: BLE001
             return ExecutionResult(
@@ -148,7 +164,7 @@ def _enforce_output_limits(
 
 
 def _measure_windows_peak_memory(proc_handle: int) -> int:
-    """Measure peak working set size of a Windows process handle in bytes."""
+    """Measures peak working set size of a Windows process handle in bytes."""
     if sys.platform != "win32":
         return 0
     with contextlib.suppress(Exception):
@@ -185,7 +201,7 @@ def _measure_windows_peak_memory(proc_handle: int) -> int:
 
 
 def _measure_posix_peak_memory() -> int:
-    """Measure peak memory of child processes on POSIX systems in bytes."""
+    """Measures peak memory of child processes on POSIX systems in bytes."""
     if sys.platform == "win32":
         return 0
     with contextlib.suppress(Exception):
@@ -243,7 +259,7 @@ _SAFE_ENV_ALLOWLIST: frozenset[str] = frozenset(
 def get_sanitized_environment(
     base_env: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    """Builds a secure, sanitized environment for untrusted subprocess execution, stripping secrets."""
+    """Builds a sanitized environment for subprocess execution, stripping secrets."""
     source = os.environ if base_env is None else base_env
     sanitized: dict[str, str] = {}
     for k, v in source.items():
@@ -258,7 +274,7 @@ def get_sanitized_environment(
 
 
 def _kill_process_tree(proc: subprocess.Popen[Any] | None) -> None:
-    """Terminates a process and all its descendants to prevent orphan process leaks."""
+    """Terminates a process and its descendants to prevent process leaks."""
     if proc is None:
         return
     with contextlib.suppress(Exception):
@@ -278,6 +294,8 @@ def _kill_process_tree(proc: subprocess.Popen[Any] | None) -> None:
 
 
 class SubprocessEngine(BaseEngine):
+    """Cross-platform fallback execution engine using process isolation and kernel telemetry."""
+
     def execute(
         self,
         source_path: Path,
@@ -376,9 +394,7 @@ class SubprocessEngine(BaseEngine):
 
 
 def get_engine() -> BaseEngine:
-    try:
-        import aestra_core  # noqa: F401
-
+    """Returns the optimal execution engine available on the current host system."""
+    if NativeEngine.is_available():
         return NativeEngine()
-    except ImportError:
-        return SubprocessEngine()
+    return SubprocessEngine()

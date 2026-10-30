@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 #[cfg(unix)]
 mod sandbox_posix;
 
+/// Executes a child process under hardware resource limits on POSIX platforms.
 #[pyfunction]
 fn execute_native(
     py: Python<'_>,
@@ -47,11 +48,12 @@ fn execute_native(
             memory_limit_mb,
         );
         Err(pyo3::exceptions::PyOSError::new_err(
-            "POSIX execution sandbox is only supported on Linux / Unix systems (e.g. WSL on Windows).",
+            "POSIX execution sandbox is only supported on Linux/Unix systems.",
         ))
     }
 }
 
+/// Aestra native sandboxing core module.
 #[pymodule]
 fn aestra_core(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(execute_native, m)?)?;

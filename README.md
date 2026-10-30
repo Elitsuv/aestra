@@ -1,138 +1,170 @@
-<p align="left">
-  <img src="assets/aestra.png" width="70" alt="Aestra Logo" align="left" style="margin-right: 15px;">
-  <strong><font size="6">Aestra</font></strong><br>
-  <a href="https://github.com/Elitsuv/aestra/releases"><img src="https://img.shields.io/badge/version-v1.0.1-blue.svg" alt="Version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
-  <a href="https://github.com/Elitsuv/aestra/actions/workflows/ci.yml"><img src="https://github.com/Elitsuv/aestra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://elitsuv.github.io/aestra/"><img src="https://img.shields.io/badge/docs-live-cyan.svg" alt="Docs"></a>
-</p>
+# Aestra
+Deterministic local judge, concurrent fuzzer, and test-case minimizer with microsecond kernel telemetry.
 
-<br><br>
-
-**Aestra** is a deterministic execution sandbox and competitive programming testing engine designed to enforce hardware constraints—CPU time and peak memory limits—with microsecond accuracy.
-
-Built with a low-overhead microsecond execution engine, a universal Windows fallback using native kernel APIs, an automated **differential output checker**, multi-language compilation with incremental caching (C++, C, Rust, Go, Python), and an interactive terminal CLI.
-
-[Read the Full Documentation & Guides](https://elitsuv.github.io/aestra/) • [Competitive Programmer's Guide](USER_GUIDE.md)
-
-> [!NOTE]
-> **v1.0.1 Stable Launch (Windows)**: Aestra is built specifically for Windows. **You DO NOT need Rust, MSVC, or any C++ compiler to run Aestra.** Standard Python 3.10+ is all that is required. The universal `SubprocessEngine` directly queries Windows kernel memory via `K32GetProcessMemoryInfo` for microsecond peak RAM and execution tracking with zero host pollution.
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/Elitsuv/aestra/actions/workflows/ci.yml/badge.svg)](https://github.com/Elitsuv/aestra/actions/workflows/ci.yml)
 
 ---
 
-## Fast 1-Click Installation (Windows)
+## Problem
 
-Just like installing Go:
+Local code runners and test harnesses fail competitive programmers and systems engineers in three fundamental ways:
 
-1. **Download Release**: Download `aestra-v1.0.1.zip` from [Releases](https://github.com/Elitsuv/aestra/releases).
-2. **Double-Click Installer**: Extract the folder and double-click [`install.bat`](file:///c:/Users/jeezh/OneDrive/Desktop/aestra/aestra/install.bat).
-   - Automatically unblocks Windows security warnings
-   - Registers `aestra` permanently to your User `PATH` (no administrator privileges needed)
-   - Creates an **Aestra** Desktop shortcut with the high-resolution app icon
-3. **Launch**: Open any terminal (Command Prompt, PowerShell, Windows Terminal) and type:
-   ```cmd
-   aestra
-   ```
+1. **Jitter & Inaccurate Telemetry**: Measuring execution with naive wall-clock timers (`time.time()` or shell `time`) includes operating system scheduling jitter, paging latency, and background system interference. Solutions pass locally only to fail with Time Limit Exceeded (TLE) on online judges.
+2. **Missing Memory Enforcement**: Standard subprocess runners cannot track peak working-set RAM or enforce hard limits. Memory allocation spikes and leaks go completely undetected until a remote platform issues Memory Limit Exceeded (MLE).
+3. **Leaked Processes & Inefficient Debugging**: Subprocess timeouts frequently leave orphan child processes executing in the background, skewing subsequent runs. When differential stress testing does find a failure, the input is typically thousands of lines of noise, forcing tedious manual reduction.
 
-*Or install in one command via PowerShell:*
+---
+
+## Solution
+
+Aestra provides deterministic local judgment by decoupling execution telemetry from host jitter and enforcing hardware-level constraints directly:
+
+- **Microsecond Kernel Telemetry**: Measures actual user and kernel CPU time down to microseconds (`rusage` on POSIX systems, `K32GetProcessMemoryInfo` on Windows), completely isolating benchmarks from OS scheduling anomalies.
+- **Hardware-Enforced Resource Constraints**: Imposes hard limits on CPU duration, peak memory address space (`RLIMIT_AS`), and maximum output volume. Violating allocations trigger immediate termination.
+- **Tree-Scoped Process Isolation**: Executes all targets in isolated sessions, ensuring full tree termination on timeout or failure with zero orphaned zombie processes.
+- **Concurrent Fuzzing & Hierarchical Minimization**: Multi-threaded fuzzing stress-tests targets against an oracle at scale. When a failure is detected, an automated hierarchical delta-debugging (DDmin) engine shrinks the counterexample to its minimal irreducible reproduction.
+- **Universal Dual-Engine Architecture**: Employs a compiled Rust core via PyO3 for zero-overhead POSIX isolation, alongside an immediate zero-compiler fallback that provides native kernel memory telemetry on Windows without requiring a C++ or Rust toolchain.
+
+---
+
+## Features
+
+- **Hardware-enforced CPU and memory limits**: Enforces CPU timeouts and peak RAM quotas with hard OS-level termination.
+- **Microsecond-resolution telemetry**: Reports exact process CPU runtime and peak physical memory consumption.
+- **Concurrent fuzzing + delta-debugging minimizer**: High-throughput multi-threaded randomized stress testing paired with automated line- and token-level input minimization.
+- **Multi-language support with caching**: Native zero-configuration compilation for C++, C, Rust, and Go with SHA-256 binary caching, plus direct execution for Python.
+- **Interactive CLI + Python SDK**: Features both a terminal interface and a scriptable Python SDK for CI/CD and custom judges.
+- **Cross-platform (native + fallback)**: High-performance Rust PyO3 core for POSIX systems and pure kernel API querying on Windows.
+
+---
+
+## Installation
+
+### Windows (Native MSI Installer)
+
+Download the latest `Aestra-Setup.msi` from [Releases](https://github.com/Elitsuv/aestra/releases).
+
+Double-click to install. The installer registers `aestra` on your system `PATH`, adds a desktop shortcut, and enables clean 1-click uninstallation from Windows Settings. Upgrades are seamless: installing a newer `.msi` replaces prior versions automatically via Windows MSI `MajorUpgrade`.
+
+Alternatively, install via Windows Package Manager:
 ```powershell
-iex (irm https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.ps1)
+winget install Aestra.Aestra
 ```
 
-### Clean Uninstallation
-To completely remove Aestra from your system at any time, double-click [`uninstall.bat`](file:///c:/Users/jeezh/OneDrive/Desktop/aestra/aestra/uninstall.bat) or click **Uninstall** inside the Setup Wizard.
+### Manual / Cross-Platform Setup
 
----
-
-## Interactive CLI Window
-
-When you type `aestra` in your terminal without flags, Aestra opens an interactive console window:
-
-```text
-  +-------------------------------------------------------------+
-  |  AESTRA  *  Deterministic CP Execution Sandbox     v1.0.1  |
-  |  Microsecond telemetry * Multi-language * Zero PC footprint |
-  +-------------------------------------------------------------+
-
-  [1] Run Solution      - Execute source or binary with microsecond telemetry
-  [2] Batch Test Suite  - Test solution against .in / .out cases directory
-  [3] Stress & Fuzz     - Automated randomized fuzzing against edge cases
-  [4] System Doctor     - Inspect system compilers and environment health
-  [5] Clean Cache       - Wipe local compilation artifacts (.aestra/build)
-  [0] Exit              - Quit Aestra
-
-  aestra> 
-```
-
----
-
-## 📘 Competitive Programmer's Quickstart Guide
-
-> [!TIP]
-> **Keep your files anywhere!** You do not need to save files inside the Aestra folder. Work directly in your usual coding or contest directory (e.g. `Documents\Contest\Problem_A\`). Read the full [User Guide (USER_GUIDE.md)](USER_GUIDE.md) for complete details.
-
-### How to Organize & Test a Contest Problem
-1. **In your contest folder**, create your solution and a `cases/` subfolder:
-   ```text
-   my_contest/
-   ├── solution.cpp          (or solution.py, solution.rs, solution.go)
-   └── cases/
-       ├── 01.in             (Sample input from problem statement)
-       ├── 01.out            (Expected sample output)
-       ├── 02.in
-       └── 02.out
-   ```
-2. **Run the Automated Judge**:
-   ```bash
-   aestra test solution.cpp --cases cases
-   ```
-   *(Aestra automatically compiles C++, Rust, and Go with 0ms SHA-256 caching!)*
-
-   *Or try the built-in demo in `examples/quickstart`:*
-   ```bash
-   aestra test examples/quickstart/solution.py --cases examples/quickstart/cases
-   ```
-3. **Inspect the Verdicts**:
-   - `[ACCEPTED]` in green: Perfect match, ready to submit!
-   - `[WRONG ANSWER]` in red: Aestra highlights the exact line-by-line diff.
-   - `[TIME LIMIT EXCEEDED]` in yellow: Breached CPU limit (default: 2000ms).
-   - `[MEMORY LIMIT EXCEEDED]` in magenta: Breached RAM limit (default: 512MB).
-
----
-
-## CLI Commands
-
-You can also use Aestra directly as a scriptable command-line utility:
-
-### Batch Testcase Runner
-
-Run a solution (supports `.cpp`, `.rs`, `.go`, `.py`, or `.exe`) against a directory of `.in` and `.out` / `.ans` test pairs:
+Requirements: Python 3.10+ (and optionally Rust 1.75+ for the POSIX native core).
 
 ```bash
-aestra test solution.cpp --cases testcases/
+git clone https://github.com/Elitsuv/aestra.git
+cd aestra
+
+# Install directly in editable mode
+pip install -e .
+
+# Or build the native Rust extension (POSIX)
+pip install maturin
+maturin develop
 ```
 
-### Single Program Execution with Live Telemetry
-
-Benchmark a binary or script under strict hardware limits:
-
-```bash
-aestra run ./solution.cpp --time-limit 1000 --memory-limit 256
-```
-
-### System Toolchain Doctor
-
-Inspect your active execution engine and detected compilers:
+Verify the installation:
 
 ```bash
 aestra doctor
 ```
 
+---
+
+## Quick Start
+
+### 1. Execute a Single Solution with Telemetry
+
+Run any source file (`.cpp`, `.py`, `.rs`, `.go`) or compiled binary under strict resource constraints:
+
+```bash
+aestra run solution.cpp --time-limit 1000 --memory-limit 256
+```
+
+Output:
+```text
+  +-- [Telemetry] ----------------------------------------------+
+  |  Status     : OK                                             |
+  |  CPU Time   : 14.2ms                                         |
+  |  Peak Memory: 3.1MB                                          |
+  |  Exit Code  : 0                                              |
+  +-------------------------------------------------------------+
+```
+
+### 2. Batch Test Suite Evaluation
+
+Test your solution against a directory containing matching `*.in` and `*.out` (or `*.ans`) files:
+
+```bash
+aestra test solution.py --cases ./cases --mode token
+```
+
+Output:
+```text
+  +-- [Batch Runner] -------------------------------------------+
+  |  Binary : solution.py                                      |
+  |  Cases  : 3 testcases from cases/                          |
+  |  Limits : 2000ms CPU, 512MB RAM                            |
+  +-------------------------------------------------------------+
+
+  [ACCEPTED]                01.in              18.4ms    9.8MB
+  [ACCEPTED]                02.in              16.1ms    9.7MB
+  [WRONG_ANSWER]            03.in              17.9ms    9.9MB
+      Expected:
+      42
+      Actual:
+      0
+
+  =============================================================
+  Summary: 2/3 accepted (FAILED) * 52.4ms * 9.9MB
+  =============================================================
+```
+
+### 3. Concurrent Fuzzing & Automated Minimization
+
+Stress-test a solution against a reference oracle across multiple worker threads and automatically minimize counterexamples:
+
+```bash
+aestra fuzz solution.py --oracle reference.py --iterations 500 --workers 4 --minimize
+```
+
+When a divergence occurs, Aestra reports the failure and minimizes the input:
+```text
+  +-- [Concurrent Fuzzer] --------------------------------------+
+  |  Target     : solution.py                                   |
+  |  Oracle     : reference.py                                  |
+  |  Iterations : 500                                           |
+  |  Workers    : 4                                             |
+  +-------------------------------------------------------------+
+
+  [BUG DISCOVERED] at iteration 84!
+  Error: Wrong Answer: Output mismatch.
+
+  [Minimizing] Delta-debugging failing input...
+  [Minimization complete]
+
+[Minimal Reproducible Input]
+-1
+```
+
+### 4. Interactive Terminal Shell
+
+Launch the interactive console dashboard by running `aestra` without arguments:
+
+```bash
+aestra
+```
+
+---
+
 ## Python SDK
 
-Aestra provides a programmatic Python SDK designed for automated testing pipelines, custom judge platforms, stress-testing harnesses, and testcase reduction.
-
-Import the SDK interfaces directly:
+Aestra provides a programmatic API for integrating local judging, fuzzing, and minimization into custom pipelines.
 
 ```python
 from src import (
@@ -144,204 +176,45 @@ from src import (
     Minimizer,
     TestCase,
 )
-```
 
----
+# 1. Run a single execution under strict limits
+judge = Judge(config=Config(time_limit_ms=1000, memory_limit_mb=256))
+result = judge.run_single("solution.py", input_data="10 20\n")
 
-### Programmatic Judge (`Judge`)
-
-The `Judge` class provides single-binary execution and automated batch evaluation under hardware constraints.
-
-#### 1. Single Execution with Resource Telemetry
-
-Execute a target binary or script once with standard input and inspect CPU and memory telemetry:
-
-```python
-from src import Config, Judge
-
-# Initialize judge with custom resource limits
-config = Config(time_limit_ms=1000, memory_limit_mb=256)
-judge = Judge(config=config)
-
-# Run target program
-result = judge.run_single("solution.py", input_data="42 58\n")
-
-print(f"Status     : {result.status.value}")
-print(f"CPU Time   : {result.cpu_time_ms:.2f} ms")
-print(f"Peak Memory: {result.peak_memory_mb:.2f} MB")
-print(f"Output     : {result.stdout.strip()}")
-```
-
-#### 2. Evaluating Against a Testcase Directory
-
-Evaluate a solution across a directory containing `.in` and `.out` / `.ans` pairs:
-
-```python
-from src import Config, Judge
-
-judge = Judge(config=Config(time_limit_ms=2000, memory_limit_mb=512))
-batch = judge.run("solution.py", cases_dir="./testcases")
-
-print(f"Verdict: {batch.overall_verdict} ({batch.passed}/{batch.total} passed)")
-for test in batch.results:
+if result.is_success:
     print(
-        f"  [{test.verdict:<14}] {test.case_name:<15} {test.cpu_time_ms:.1f}ms  {test.peak_memory_mb:.1f}MB"
+        f"Output: {result.stdout.strip()} ({result.cpu_time_ms:.1f}ms, {result.peak_memory_mb:.1f}MB)"
     )
-```
 
-#### 3. In-Memory Test Suites
-
-Evaluate test cases defined dynamically in code without creating temporary files:
-
-```python
-from src import Judge, TestCase
-
-judge = Judge()
-cases = [
-    TestCase(name="sample_1", input_data="3 5\n", expected_output="8\n"),
-    TestCase(name="sample_2", input_data="10 -4\n", expected_output="6\n"),
-]
-
-batch = judge.run("solution.py", test_cases=cases)
-print(f"Passed {batch.passed} of {batch.total} tests.")
-```
-
----
-
-### Automated Fuzzing & Differential Testing (`Fuzzer`)
-
-The `Fuzzer` generates randomized inputs to identify edge cases, timeouts, host resource exhaustion, or logic divergences.
-
-#### 1. Crash & Timeout Detection
-
-Stress-test a solution to verify it terminates safely without runtime errors or resource limit breaches:
-
-```python
-from src import Config, Fuzzer
-
-fuzzer = Fuzzer(
-    target_binary="solution.py",
-    config=Config(time_limit_ms=500, memory_limit_mb=128),
-)
-
-report = fuzzer.run(iterations=500)
-if report.found_bug:
-    print(f"Bug discovered on iteration {report.iterations_run}:")
-    print(f"Error: {report.error_message}")
-    print(f"Failing Input:\n{report.failing_input}")
-else:
-    print(f"All {report.iterations_run} fuzz iterations passed.")
-```
-
-#### 2. Differential Testing Against an Oracle
-
-Compare outputs against a trusted reference binary or Python function:
-
-```python
-from src import Fuzzer
+# 2. Evaluate batch test cases (directory or in-memory)
+batch = judge.run("solution.py", cases_dir="./cases")
+print(f"Verdict: {batch.overall_verdict} ({batch.passed}/{batch.total} passed)")
 
 
-# Trusted reference solution (e.g. brute-force or Python model)
-def reference_oracle(input_str: str) -> str:
-    nums = [int(x) for x in input_str.split() if x.strip()]
+# 3. Concurrent fuzzing against an oracle function or binary
+def brute_force_oracle(inp: str) -> str:
+    nums = [int(x) for x in inp.split()]
     return str(sum(nums))
 
 
-# Custom input generator for stress testing
-def generate_random_case(iteration: int) -> str:
-    import random
-
-    n = random.randint(1, 50)
-    vals = [str(random.randint(-1000, 1000)) for _ in range(n)]
-    return f"{n}\n" + " ".join(vals) + "\n"
-
-
 fuzzer = Fuzzer(
-    target_binary="optimized_solution.exe",
-    oracle=reference_oracle,
-    generator=generate_random_case,
-)
-
-report = fuzzer.run(iterations=250)
-if report.found_bug:
-    print("Divergence identified!")
-    print(f"Failing input: {report.failing_input}")
-    print(f"Details: {report.error_message}")
-```
-
----
-
-### Delta-Debugging Testcase Minimizer (`Minimizer`)
-
-When fuzzing uncovers a failure with a large input, `Minimizer` uses hierarchical Delta Debugging (DDmin) across line and token granularities to shrink the input to the smallest reproducible failure:
-
-```python
-from src import Minimizer
-
-
-def reference_oracle(input_str: str) -> str:
-    nums = [int(x) for x in input_str.split() if x.strip()]
-    return str(sum(nums))
-
-
-minimizer = Minimizer(
     target_binary="solution.py",
-    oracle=reference_oracle,
+    oracle=brute_force_oracle,
+    config=Config(time_limit_ms=500),
 )
+report = fuzzer.run(iterations=200, workers=4)
 
-large_failing_input = "50\n" + " ".join(str(i) for i in range(500)) + "\n"
+if report.found_bug:
+    print(f"Divergence found on input: {report.failing_input}")
 
-# Reduces multi-line and multi-token inputs down to minimal reproduction
-minimal_input = minimizer.minimize(large_failing_input, max_steps=200)
-
-print("Minimal reproducible input:")
-print(minimal_input)
-```
-
----
-
-### Configuration & TOML Integration (`Config`)
-
-Aestra configuration can be defined programmatically or loaded directly from an `aestra.toml` file:
-
-```python
-from src import CheckerMode, Config, Judge
-
-# Programmatic configuration
-config = Config(
-    time_limit_ms=1500,
-    memory_limit_mb=256,
-    checker_mode=CheckerMode.TOKEN,  # TOKEN, EXACT, IGNORE_WHITESPACE
-    output_limit_bytes=10 * 1024 * 1024,  # Maximum captured output bytes
-)
-
-# Or load from an aestra.toml file
-config_from_file = Config.from_toml("aestra.toml")
-
-judge = Judge(config=config_from_file)
-```
-
----
-
-## Development & Testing
-
-Run the complete 27-test unified suite:
-
-```bash
-python -m tests.test
-```
-
-Verify code quality with strict type checking and linting:
-
-```bash
-python -m ruff check .
-python -m ruff format --check .
-python -m mypy src
+    # 4. Minimize failing input using delta debugging
+    minimizer = Minimizer(target_binary="solution.py", oracle=brute_force_oracle)
+    minimal_input = minimizer.minimize(report.failing_input)
+    print(f"Minimal reproduction: {minimal_input}")
 ```
 
 ---
 
 ## License
 
-Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
-
+Distributed under the [MIT License](LICENSE).

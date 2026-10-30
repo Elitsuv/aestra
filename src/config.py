@@ -9,6 +9,8 @@ from src.checker import CheckerMode
 
 @dataclass(frozen=True, slots=True)
 class ExecutionLimits:
+    """Hardware constraint limits for sandboxed execution."""
+
     time_limit_ms: int = 2000
     memory_limit_mb: int = 512
     output_limit_bytes: int = 10 * 1024 * 1024
@@ -24,6 +26,8 @@ class ExecutionLimits:
 
 @dataclass(slots=True)
 class Config:
+    """Runtime configuration for Aestra judge, fuzzer, and minimizer."""
+
     time_limit_ms: int = 2000
     memory_limit_mb: int = 512
     checker_mode: CheckerMode = CheckerMode.TOKEN

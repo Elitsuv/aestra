@@ -35,8 +35,8 @@ pub fn execute_posix(
                 exit_code: 1,
                 cpu_time_ms: 0.0,
                 peak_memory_bytes: 0,
-                stdout: "".to_string(),
-                stderr: "".to_string(),
+                stdout: String::new(),
+                stderr: String::new(),
                 error_message: Some("Failed to create POSIX IPC pipes".to_string()),
             };
         }
@@ -49,9 +49,9 @@ pub fn execute_posix(
                 exit_code: 1,
                 cpu_time_ms: 0.0,
                 peak_memory_bytes: 0,
-                stdout: "".to_string(),
-                stderr: "".to_string(),
-                error_message: Some("POSIX fork() system call failed".to_string()),
+                stdout: String::new(),
+                stderr: String::new(),
+                error_message: Some("POSIX fork() call failed".to_string()),
             };
         }
 
@@ -96,7 +96,6 @@ pub fn execute_posix(
             c_args_ptrs.push(std::ptr::null());
 
             let env_ptrs: [*const libc::c_char; 1] = [std::ptr::null()];
-
             libc::execve(c_cmd.as_ptr(), c_args_ptrs.as_ptr(), env_ptrs.as_ptr());
             libc::_exit(127);
         }
@@ -107,7 +106,7 @@ pub fn execute_posix(
 
         if !input_data.is_empty() {
             let bytes = input_data.as_bytes();
-            libc::write(
+            let _ = libc::write(
                 stdin_pipe[1],
                 bytes.as_ptr() as *const libc::c_void,
                 bytes.len(),
