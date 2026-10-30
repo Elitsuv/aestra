@@ -18,7 +18,7 @@ from src.engine import NativeEngine, get_engine
 from src.runner import BatchRunner
 from src.sdk import Fuzzer, Minimizer
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 
 def _parse_version(v: str) -> tuple[int, ...]:

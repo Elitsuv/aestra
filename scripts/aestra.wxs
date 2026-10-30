@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Aestra"
            Manufacturer="Suvro Bhowmick"
-           Version="1.1.0"
+           Version="1.1.1"
            UpgradeCode="C8B7A124-4B29-4F58-8C61-5B26E50D6B19"
            Scope="perUserOrMachine">
 

@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "aestra"
-version = "1.1.0"
+version = "1.1.1"
 description = "Deterministic local judge, concurrent fuzzer, and test-case minimizer with microsecond kernel telemetry."
 readme = "README.md"
 license = { text = "MIT" }
