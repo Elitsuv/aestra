@@ -5,6 +5,8 @@ from enum import Enum
 
 
 class ExecutionStatus(str, Enum):
+    """Execution status verdict for sandboxed processes."""
+
     SUCCESS = "SUCCESS"
     OK = "OK"
     ACCEPTED = "ACCEPTED"
@@ -20,6 +22,8 @@ class ExecutionStatus(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class ExecutionResult:
+    """Telemetry and outcome data from a process execution run."""
+
     status: ExecutionStatus
     exit_code: int = 0
     cpu_time_ms: float = 0.0

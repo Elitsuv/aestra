@@ -2,23 +2,16 @@
 name = "aestra_core"
 version = "1.1.0"
 edition = "2021"
-description = "High-performance POSIX & Windows sandboxing core for Aestra CP Engine"
+description = "Deterministic execution sandbox core for Aestra CP Engine"
+license = "MIT"
 
 [lib]
 name = "aestra_core"
 crate-type = ["cdylib"]
+path = "src/core/lib.rs"
 
 [dependencies]
 pyo3 = { version = "0.20", features = ["extension-module", "abi3-py310"] }
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.52", features = [
-    "Win32_Foundation",
-    "Win32_System_JobObjects",
-    "Win32_System_Threading",
-    "Win32_System_ProcessStatus",
-    "Win32_Security",
-] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -21,7 +21,7 @@ class CompilationError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class CompilationResult:
-    """Represents the outcome of a compilation or cache lookup."""
+    """Outcome of a compilation or cache lookup."""
 
     success: bool
     executable_path: Path
@@ -31,7 +31,7 @@ class CompilationResult:
 
 
 class CompilerManager:
-    """Detects system compilers, builds source files with CP flags, and caches output."""
+    """Detects system compilers, builds source files, and caches binary artifacts."""
 
     BUILD_DIR = Path(".aestra") / "build"
 
@@ -61,7 +61,7 @@ class CompilerManager:
 
     @classmethod
     def prepare(cls, target_path: str | Path) -> CompilationResult:
-        """Resolves target_path to an executable binary, compiling source files if necessary."""
+        """Resolves target_path to an executable binary, compiling source if necessary."""
         target_p = Path(target_path)
         if target_p.name.startswith("-"):
             raise ValueError(
@@ -140,8 +140,7 @@ class CompilerManager:
         compiler = shutil.which("g++") or shutil.which("clang++")
         if not compiler:
             raise CompilationError(
-                "Neither 'g++' nor 'clang++' was found on your system PATH. "
-                "Please install a C++ compiler to test .cpp files."
+                "Neither 'g++' nor 'clang++' was found on system PATH."
             )
         cmd = [
             compiler,
@@ -160,7 +159,7 @@ class CompilerManager:
         compiler = shutil.which("gcc") or shutil.which("clang")
         if not compiler:
             raise CompilationError(
-                "Neither 'gcc' nor 'clang' was found on your system PATH."
+                "Neither 'gcc' nor 'clang' was found on system PATH."
             )
         cmd = [
             compiler,
@@ -177,10 +176,7 @@ class CompilerManager:
     def _compile_rust(cls, source_path: Path, out_path: Path) -> CompilationResult:
         compiler = shutil.which("rustc")
         if not compiler:
-            raise CompilationError(
-                "'rustc' was not found on your system PATH. "
-                "Please install the Rust toolchain (https://rustup.rs) to test .rs files."
-            )
+            raise CompilationError("'rustc' was not found on system PATH.")
         cmd = [compiler, "-O", "-o", str(out_path), "--", str(source_path)]
         return cls._run_compiler_command(cmd, out_path)
 
@@ -188,10 +184,7 @@ class CompilerManager:
     def _compile_go(cls, source_path: Path, out_path: Path) -> CompilationResult:
         compiler = shutil.which("go")
         if not compiler:
-            raise CompilationError(
-                "'go' was not found on your system PATH. "
-                "Please install Go (https://go.dev) to test .go files."
-            )
+            raise CompilationError("'go' was not found on system PATH.")
         cmd = [compiler, "build", "-o", str(out_path), str(source_path)]
         return cls._run_compiler_command(cmd, out_path)
 

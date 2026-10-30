@@ -150,65 +150,68 @@
     </tbody>
   </table>
 
-  <h2 data-toc>1-Click Setup Wizard</h2>
-  <p>Install Aestra in seconds with the graphical Setup Wizard:</p>
+  <h2 data-toc>Windows Native Installer (.msi)</h2>
+  <p>Install Aestra using the standard Windows graphical installer:</p>
 
   <div class="cb">
     <div class="cb-bar">
       <span class="cb-lang">cmd</span>
-      <button class="cb-copy" data-target="c-inst-bat"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+      <button class="cb-copy" data-target="c-inst-msi"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
     </div>
-    <pre><code id="c-inst-bat"># Simply double-click install.bat in the Aestra folder:
-install.bat</code></pre>
+    <pre><code id="c-inst-msi"># Download Aestra-Setup.msi from GitHub Releases and double-click or run:
+msiexec /i Aestra-Setup.msi /quiet</code></pre>
   </div>
 
-  <p style="margin-top:16px;margin-bottom:8px">Or run the one-line PowerShell remote installer:</p>
+  <p style="margin-top:16px;margin-bottom:8px">Or install via Windows Package Manager (winget):</p>
   <div class="cb">
     <div class="cb-bar">
       <span class="cb-lang">powershell</span>
-      <button class="cb-copy" data-target="c-inst-win"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+      <button class="cb-copy" data-target="c-inst-winget"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
     </div>
-    <pre><code id="c-inst-win">iex (irm https://raw.githubusercontent.com/Elitsuv/aestra/main/scripts/install.ps1)</code></pre>
+    <pre><code id="c-inst-winget">winget install Aestra.Aestra</code></pre>
   </div>
 
-  <p><strong>What the installer executes:</strong></p>
+  <p style="margin-top:16px;margin-bottom:8px">Or install globally via pip:</p>
+  <div class="cb">
+    <div class="cb-bar">
+      <span class="cb-lang">bash</span>
+      <button class="cb-copy" data-target="c-inst-pip"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
+    </div>
+    <pre><code id="c-inst-pip">pip install aestra</code></pre>
+  </div>
+
+  <p><strong>What the MSI installer configures:</strong></p>
   <ul style="margin: 8px 0 16px 20px; font-size:13.5px; color:var(--t2);">
-    <li>Verifies <code>python</code> (3.10+) is detected; guides you if missing</li>
-    <li>Installs Aestra into <code>~/.aestra</code> and registers <code>aestra</code> in User PATH permanently</li>
-    <li>Generates an <strong>Aestra</strong> Desktop shortcut with the custom App Icon</li>
-    <li>Runs automated health diagnostics (<code>aestra doctor</code>) to check compilers</li>
+    <li>Installs to <code>%ProgramFiles%\Aestra</code> with proper system permissions</li>
+    <li>Permanently registers <code>aestra</code> in the system <code>PATH</code></li>
+    <li>Creates a Desktop shortcut with the native <code>aestra.ico</code> emblem</li>
+    <li>Supports seamless in-place updates and rollback via native Windows MSI MajorUpgrade</li>
   </ul>
 
   <div class="callout safe">
     <i data-lucide="shield-check" stroke-width="1.8"></i>
-    <p><strong>Safe & non-intrusive.</strong> The installer operates entirely in user space. It never touches system-wide registry hives, never requests administrator rights, and produces zero host pollution.</p>
+    <p><strong>Safe, offline & private.</strong> Aestra is 100% offline with zero network phone-home, zero remote telemetry, and zero background services.</p>
   </div>
 
   <h2 data-toc>Verify installation</h2>
-  <p>Run this command to confirm the engine is working and see which backend is active:</p>
+  <p>Run diagnostic checks to verify runtime engines and toolchain compilers:</p>
   <div class="cb">
     <div class="cb-bar">
-      <span class="cb-lang">python</span>
+      <span class="cb-lang">powershell</span>
       <button class="cb-copy" data-target="c-verify"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
     </div>
-    <pre><code id="c-verify">python3 -c "from src.engine import get_engine; e = get_engine(); print(type(e).__name__)"</code></pre>
+    <pre><code id="c-verify">aestra doctor</code></pre>
   </div>
-  <table>
-    <thead><tr><th>Output</th><th>Meaning</th></tr></thead>
-    <tbody>
-      <tr><td><code>NativeEngine</code></td><td>Rust POSIX sandbox loaded — full hardware enforcement available</td></tr>
-      <tr><td><code>SubprocessEngine</code></td><td>Fallback mode — timeouts work, kernel-level memory measurement unavailable</td></tr>
-    </tbody>
-  </table>
 
   <h2 data-toc>Uninstall</h2>
-  <p>To cleanly remove Aestra from your system at any time, double-click <code>uninstall.bat</code> or click <b>Uninstall</b> inside the Setup Wizard:</p>
+  <p>To cleanly remove Aestra at any time, use Windows Settings or run msiexec:</p>
   <div class="cb">
     <div class="cb-bar">
       <span class="cb-lang">cmd</span>
       <button class="cb-copy" data-target="c-uninstall"><i data-lucide="copy" stroke-width="1.8"></i> Copy</button>
     </div>
-    <pre><code id="c-uninstall">uninstall.bat        <span class="cm"># Cleanly removes ~/.aestra, PATH entries, and shortcuts</span></code></pre>
+    <pre><code id="c-uninstall"># In Windows Settings -> Installed apps -> Aestra -> Uninstall, or:
+msiexec /x Aestra-Setup.msi /quiet</code></pre>
   </div>
 </section>
 
@@ -706,27 +709,28 @@ print(f<span class="str">"CPU Time: {result.cpu_time_ms}ms | Peak RAM: {result.p
     <div class="cb-bar"><span class="cb-lang">tree</span></div>
     <pre><code>aestra/
 ├── src/
-│   ├── __init__.py          <span class="cm"># Package exports</span>
-│   ├── cli.py               <span class="cm"># CLI entrypoint (run, test commands)</span>
-│   ├── config.py            <span class="cm"># ExecutionLimits dataclass</span>
-│   ├── models.py            <span class="cm"># ExecutionResult, ExecutionStatus enum</span>
-│   ├── engine.py            <span class="cm"># BaseEngine, NativeEngine, SubprocessEngine, get_engine()</span>
-│   ├── runner.py            <span class="cm"># BatchRunner engine with testcase discovery</span>
-│   ├── checker.py           <span class="cm"># OutputChecker with TOKEN/EXACT/IGNORE_WHITESPACE</span>
-│   ├── lib.rs               <span class="cm"># PyO3 module definition — exposes execute_native()</span>
-│   └── sandbox_posix.rs     <span class="cm"># Rust POSIX sandbox: fork, setrlimit, execve, wait4</span>
+│   ├── core/
+│   │   ├── lib.rs               <span class="cm"># PyO3 module definition — exposes execute_native()</span>
+│   │   └── sandbox_posix.rs     <span class="cm"># Rust POSIX sandbox: fork, setrlimit, execve, wait4</span>
+│   ├── __init__.py              <span class="cm"># Package exports</span>
+│   ├── checker.py               <span class="cm"># OutputChecker & FloatToleranceChecker</span>
+│   ├── cli.py                   <span class="cm"># Production CLI (run, test, fuzz, doctor)</span>
+│   ├── compiler.py              <span class="cm"># Multi-language compiler pipeline & SHA-256 caching</span>
+│   ├── config.py                <span class="cm"># ExecutionLimits dataclass</span>
+│   ├── engine.py                <span class="cm"># NativeEngine & SubprocessEngine</span>
+│   ├── models.py                <span class="cm"># ExecutionResult & ExecutionStatus</span>
+│   ├── runner.py                <span class="cm"># BatchRunner engine & testcase discovery</span>
+│   └── sdk.py                   <span class="cm"># High-level SDK, concurrent Fuzzer & Minimizer</span>
 ├── tests/
-│   └── test.py              <span class="cm"># Unified test suite</span>
-├── install.bat              <span class="cm"># 1-Click Windows Setup Wizard</span>
-├── uninstall.bat            <span class="cm"># 1-Click Windows Clean Uninstaller</span>
+│   ├── test.py                  <span class="cm"># Master test suite runner</span>
+│   └── test_*.py                <span class="cm"># Modular unit & integration tests</span>
 ├── scripts/
-│   ├── wizard.ps1           <span class="cm"># Native Windows GUI installer dialog</span>
-│   ├── install.ps1          <span class="cm"># Automated PowerShell installer</span>
-│   └── uninstall.ps1        <span class="cm"># Clean system uninstaller script</span>
-├── Cargo.toml               <span class="cm"># Optional Rust extension crate config</span>
-├── pyproject.toml            <span class="cm"># Python project metadata</span>
-└── .github/
-    └── workflows/ci.yml     <span class="cm"># CI: Ruff, Mypy, Clippy, Cargo Test, Maturin Build</span></code></pre>
+│   ├── aestra.wxs               <span class="cm"># WiX v4 definition for native Windows MSI installer</span>
+│   └── build_msi.ps1            <span class="cm"># Automated zero-cost WiX build script</span>
+├── assets/                      <span class="cm"># Application icons & emblem branding</span>
+├── Cargo.toml                   <span class="cm"># Core Rust extension crate configuration</span>
+├── pyproject.toml               <span class="cm"># Python build & packaging metadata</span>
+└── .github/workflows/           <span class="cm"># CI, release packaging, and MSI workflows</span></code></pre>
   </div>
 </section>
 
@@ -948,6 +952,21 @@ cargo test --all                                              <span class="cm">#
   <div class="crumb">Community / <b>Changelog</b></div>
   <h1>Changelog</h1>
   <p class="lead">Release notes and version history for Aestra.</p>
+
+  <div class="rel">
+    <div class="rel-head">
+      <span class="rel-tag">v1.1.0 Production</span>
+      <span class="rel-date">October 2026</span>
+    </div>
+    <p>Production release: WiX v4 native Windows MSI installer, concurrent fuzzing engine with delta-debugging minimizer, modular 54-test suite, and complete telemetry purge.</p>
+    <ul>
+      <li><strong>Native Windows MSI Installer:</strong> Professional <code>Aestra-Setup.msi</code> generated via WiX Toolset ($0 cost), providing native Windows Add/Remove Programs integration and automatic PATH registration.</li>
+      <li><strong>Concurrent Fuzzer & Minimizer:</strong> Multi-worker testcase stress testing with hierarchical delta-debugging algorithm for automatic minimal reproduction extraction.</li>
+      <li><strong>100% Offline & Private:</strong> Complete deletion of all remote telemetry and network checkers in strict compliance with engineering ethics.</li>
+      <li><strong>Core Separation:</strong> Rust kernel sandbox moved to dedicated <code>src/core/</code> crate architecture with clean Python bindings.</li>
+      <li><strong>Modular 54-Test Suite:</strong> 100% clean test pass rate covering batch execution, floating-point tolerance, compiler caching, and CLI command workflows.</li>
+    </ul>
+  </div>
 
   <div class="rel">
     <div class="rel-head">

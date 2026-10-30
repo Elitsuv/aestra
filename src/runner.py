@@ -11,13 +11,42 @@ from src.models import ExecutionStatus
 
 @dataclass(frozen=True, slots=True)
 class TestCase:
+    """Test case definition supporting file paths or in-memory strings."""
+
     name: str
-    input_path: Path
-    expected_output_path: Path
+    input_path: Path | None = None
+    expected_output_path: Path | None = None
+    input_data: str | None = None
+    expected_output: str | None = None
+
+    def get_input(self) -> str:
+        """Retrieves input data from memory or reads from file."""
+        if self.input_data is not None:
+            return self.input_data
+        if self.input_path is not None and self.input_path.is_file():
+            with open(self.input_path, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
+        return ""
+
+    def get_expected_output(self) -> str:
+        """Retrieves expected output from memory or reads from file."""
+        if self.expected_output is not None:
+            return self.expected_output
+        if (
+            self.expected_output_path is not None
+            and self.expected_output_path.is_file()
+        ):
+            with open(
+                self.expected_output_path, "r", encoding="utf-8", errors="replace"
+            ) as f:
+                return f.read()
+        return ""
 
 
 @dataclass(slots=True)
 class TestResult:
+    """Result and telemetry of an individual test case execution."""
+
     case_name: str
     verdict: str
     cpu_time_ms: float
@@ -28,6 +57,8 @@ class TestResult:
 
 @dataclass(slots=True)
 class BatchResult:
+    """Aggregated outcome across a batch test suite."""
+
     passed: int
     total: int
     overall_verdict: str
@@ -37,6 +68,8 @@ class BatchResult:
 
 
 class BatchRunner:
+    """Test case discoverer and batch evaluation executor."""
+
     def __init__(self, engine: BaseEngine | None = None) -> None:
         self.engine = engine if engine is not None else get_engine()
 
@@ -84,14 +117,9 @@ class BatchRunner:
         limits: ExecutionLimits,
         checker: BaseChecker,
     ) -> TestResult:
-        """Executes a single testcase and compares output."""
-        with open(case.input_path, "r", encoding="utf-8", errors="replace") as f:
-            input_text = f.read()
-
-        with open(
-            case.expected_output_path, "r", encoding="utf-8", errors="replace"
-        ) as f:
-            expected_output = f.read()
+        """Executes a single testcase and compares output against expected."""
+        input_text = case.get_input()
+        expected_output = case.get_expected_output()
 
         res = self.engine.execute(source_path, limits, input_data=input_text)
 

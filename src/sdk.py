@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from src.runner import BatchResult, BatchRunner, TestCase, TestResult
 
 
 class Judge:
-    """High-level programmatic interface to evaluate binaries and test suites."""
+    """Programmatic interface to evaluate binaries and test suites."""
 
     def __init__(
         self,
@@ -106,8 +107,10 @@ class Judge:
         raise ValueError("Either cases_dir or test_cases must be provided.")
 
 
-@dataclass
+@dataclass(slots=True)
 class FuzzResult:
+    """Outcome and telemetry of a fuzzing campaign."""
+
     found_bug: bool
     iterations_run: int
     failing_input: str | None = None
@@ -117,7 +120,7 @@ class FuzzResult:
 
 
 def _default_input_generator(iteration: int) -> str:
-    """Generates varied randomized test inputs (numbers, lists, strings)."""
+    """Generates varied deterministic randomized test inputs based on iteration index."""
     rng = random.Random(iteration ^ 0x5DEECE66D)
     variant = iteration % 3
     if variant == 0:
@@ -134,7 +137,7 @@ def _default_input_generator(iteration: int) -> str:
 
 
 class Fuzzer:
-    """Stress-tests a binary using automated or custom input generation."""
+    """Stress-tests a binary using automated or custom input generation with concurrency support."""
 
     def __init__(
         self,
@@ -201,56 +204,93 @@ class Fuzzer:
 
         return "", True, None
 
-    def run(self, iterations: int = 100) -> FuzzResult:
-        """Runs fuzz iterations until a bug is found or all iterations pass."""
+    def _test_single_iteration(self, iteration: int) -> tuple[int, FuzzResult | None]:
+        """Evaluates iteration `iteration`. Returns (iteration, FuzzResult if bug or error else None)."""
+        test_input = self.generator(iteration)
         limits = self.config.to_limits()
+        target_res = self.engine.execute(
+            self.target_binary, limits, input_data=test_input
+        )
 
-        for i in range(iterations):
-            test_input = self.generator(i)
-            target_res = self.engine.execute(
-                self.target_binary, limits, input_data=test_input
+        if target_res.status != ExecutionStatus.OK:
+            return iteration, FuzzResult(
+                found_bug=True,
+                iterations_run=iteration + 1,
+                failing_input=test_input,
+                execution_result=target_res,
+                error_message=f"Target failed with status {target_res.status.value}: {target_res.error_message or ''}".strip(),
             )
 
-            # Check 1: Target execution crash, timeout, or OOM
-            if target_res.status != ExecutionStatus.OK:
-                return FuzzResult(
-                    found_bug=True,
-                    iterations_run=i + 1,
+        if self.oracle is not None:
+            oracle_out, oracle_ok, oracle_err = self._run_oracle(test_input)
+            if not oracle_ok:
+                return iteration, FuzzResult(
+                    found_bug=False,
+                    iterations_run=iteration + 1,
                     failing_input=test_input,
-                    execution_result=target_res,
-                    error_message=f"Target failed with status {target_res.status.value}: {target_res.error_message or ''}".strip(),
+                    error_message=f"Oracle evaluation failure: {oracle_err}",
                 )
 
-            # Check 2: Oracle comparison if oracle provided
-            if self.oracle is not None:
-                oracle_out, oracle_ok, oracle_err = self._run_oracle(test_input)
-                if not oracle_ok:
+            check_res = self.checker.check(target_res.stdout, oracle_out)
+            if not check_res.is_correct:
+                return iteration, FuzzResult(
+                    found_bug=True,
+                    iterations_run=iteration + 1,
+                    failing_input=test_input,
+                    execution_result=target_res,
+                    oracle_output=oracle_out,
+                    error_message=f"Wrong Answer: Output mismatch.\nDiff:\n{check_res.diff or ''}".strip(),
+                )
+
+        return iteration, None
+
+    def run(self, iterations: int = 100, workers: int = 1) -> FuzzResult:
+        """Runs fuzz iterations sequentially or concurrently until a bug is found or iterations exhaust."""
+        if iterations <= 0:
+            return FuzzResult(found_bug=False, iterations_run=0)
+
+        effective_workers = max(1, workers)
+        if effective_workers == 1:
+            for i in range(iterations):
+                _, bug_result = self._test_single_iteration(i)
+                if bug_result is not None:
+                    return bug_result
+            return FuzzResult(found_bug=False, iterations_run=iterations)
+
+        # Concurrent fuzzing campaign
+        completed_count = 0
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=effective_workers
+        ) as executor:
+            future_to_iter = {
+                executor.submit(self._test_single_iteration, i): i
+                for i in range(iterations)
+            }
+
+            for future in concurrent.futures.as_completed(future_to_iter):
+                completed_count += 1
+                try:
+                    _iter_idx, bug_res = future.result()
+                    if bug_res is not None:
+                        # Cancel remaining pending work
+                        for f in future_to_iter:
+                            f.cancel()
+                        bug_res.iterations_run = completed_count
+                        return bug_res
+                except Exception as exc:  # noqa: BLE001
+                    for f in future_to_iter:
+                        f.cancel()
                     return FuzzResult(
                         found_bug=False,
-                        iterations_run=i + 1,
-                        failing_input=test_input,
-                        error_message=f"Oracle evaluation failure: {oracle_err}",
+                        iterations_run=completed_count,
+                        error_message=f"Fuzzing worker exception: {exc}",
                     )
 
-                check_res = self.checker.check(target_res.stdout, oracle_out)
-                if not check_res.is_correct:
-                    return FuzzResult(
-                        found_bug=True,
-                        iterations_run=i + 1,
-                        failing_input=test_input,
-                        execution_result=target_res,
-                        oracle_output=oracle_out,
-                        error_message=f"Wrong Answer: Output mismatch.\nDiff:\n{check_res.diff or ''}".strip(),
-                    )
-
-        return FuzzResult(
-            found_bug=False,
-            iterations_run=iterations,
-        )
+        return FuzzResult(found_bug=False, iterations_run=iterations)
 
 
 class Minimizer:
-    """Reduces large failing test cases to minimal reproducible inputs using delta debugging."""
+    """Reduces failing test cases to minimal reproducible inputs using hierarchical delta debugging."""
 
     def __init__(
         self,

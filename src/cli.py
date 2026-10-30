@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import platform
+import shutil
+import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from src.checker import CheckerMode
@@ -10,9 +16,109 @@ from src.compiler import CompilationError, CompilerManager
 from src.config import ExecutionLimits
 from src.engine import NativeEngine, get_engine
 from src.runner import BatchRunner
-from src.sdk import Fuzzer
+from src.sdk import Fuzzer, Minimizer
 
 VERSION = "1.1.0"
+
+
+def _parse_version(v: str) -> tuple[int, ...]:
+    clean = v.lstrip("v").strip()
+    try:
+        return tuple(int(x) for x in clean.split("."))
+    except ValueError:
+        return (0, 0, 0)
+
+
+def check_for_updates() -> str | None:
+    """Checks GitHub releases for updates with 24h cache and 1s timeout (0 user data)."""
+    try:
+        cache_dir = Path(".aestra")
+        cache_file = cache_dir / "update_cache.json"
+        now = time.time()
+
+        if cache_file.exists():
+            try:
+                cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
+                if now - cache_data.get("timestamp", 0) < 86400:
+                    cached_tag = str(cache_data.get("latest_tag", ""))
+                    if cached_tag and _parse_version(cached_tag) > _parse_version(
+                        VERSION
+                    ):
+                        return cached_tag
+                    return None
+            except (OSError, ValueError, TypeError, KeyError):
+                pass
+
+        url = "https://api.github.com/repos/Elitsuv/aestra/releases/latest"
+        req = urllib.request.Request(url, headers={"User-Agent": "Aestra-CLI"})
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            latest_tag = str(data.get("tag_name", "")).strip()
+
+            try:
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                cache_file.write_text(
+                    json.dumps({"timestamp": now, "latest_tag": latest_tag}),
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass
+
+            if latest_tag and _parse_version(latest_tag) > _parse_version(VERSION):
+                return latest_tag
+    except (OSError, ValueError, urllib.error.URLError, TimeoutError):
+        pass
+
+    return None
+
+
+def _parse_version(v: str) -> tuple[int, ...]:
+    clean = v.lstrip("v").strip()
+    try:
+        return tuple(int(x) for x in clean.split("."))
+    except ValueError:
+        return (0, 0, 0)
+
+
+def check_for_updates() -> str | None:
+    """Checks GitHub releases for updates with 24h cache and 1s timeout (0 user data)."""
+    try:
+        cache_dir = Path(".aestra")
+        cache_file = cache_dir / "update_cache.json"
+        now = time.time()
+
+        if cache_file.exists():
+            try:
+                cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
+                if now - cache_data.get("timestamp", 0) < 86400:
+                    cached_tag = str(cache_data.get("latest_tag", ""))
+                    if cached_tag and _parse_version(cached_tag) > _parse_version(VERSION):
+                        return cached_tag
+                    return None
+            except (OSError, ValueError, TypeError, KeyError):
+                pass
+
+        url = "https://api.github.com/repos/Elitsuv/aestra/releases/latest"
+        req = urllib.request.Request(url, headers={"User-Agent": "Aestra-CLI"})
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            latest_tag = str(data.get("tag_name", "")).strip()
+
+            try:
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                cache_file.write_text(
+                    json.dumps({"timestamp": now, "latest_tag": latest_tag}),
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass
+
+            if latest_tag and _parse_version(latest_tag) > _parse_version(VERSION):
+                return latest_tag
+    except (OSError, ValueError, urllib.error.URLError, TimeoutError):
+        pass
+
+    return None
 
 
 def _enable_windows_ansi() -> None:
@@ -61,13 +167,11 @@ SHELL_HEADER = f"""
 
 
 def _clean_path_input(raw: str) -> Path:
-    """Cleans path strings from interactive input, handling drag-and-drop quotes."""
     cleaned = raw.strip().strip("'").strip('"')
     return Path(cleaned)
 
 
 def _validate_source_file(path: Path) -> str | None:
-    """Validates that target file exists and is not empty. Returns error message or None."""
     if not path.exists():
         return f"Target '{path}' not found."
     if not path.is_file():
@@ -78,7 +182,6 @@ def _validate_source_file(path: Path) -> str | None:
                 f"Target file '{path.name}' is empty (0 bytes). "
                 f"Please add your solution code to the file before executing."
             )
-        # Check if small source text file is whitespace-only
         if (
             path.suffix.lower() in (".py", ".cpp", ".c", ".cc", ".rs", ".go")
             and path.stat().st_size < 50_000
@@ -244,13 +347,99 @@ def test_command(args: argparse.Namespace) -> int:
     return 0 if is_all_passed else 1
 
 
+def fuzz_command(args: argparse.Namespace) -> int:
+    raw_path = Path(args.binary)
+    validation_err = _validate_source_file(raw_path)
+    if validation_err:
+        print(f"Error: {validation_err}", file=sys.stderr)
+        return 1
+
+    try:
+        comp_res = CompilerManager.prepare(raw_path)
+        target_exec = comp_res.executable_path
+    except CompilationError as e:
+        print(f"Error: {e.message}", file=sys.stderr)
+        return 1
+
+    oracle_path = Path(args.oracle) if args.oracle else None
+    if oracle_path is not None:
+        val_err = _validate_source_file(oracle_path)
+        if val_err:
+            print(f"Error with oracle: {val_err}", file=sys.stderr)
+            return 1
+        try:
+            oracle_comp = CompilerManager.prepare(oracle_path)
+            oracle_path = oracle_comp.executable_path
+        except CompilationError as e:
+            print(f"Error compiling oracle: {e.message}", file=sys.stderr)
+            return 1
+
+    workers = getattr(args, "workers", 1)
+    iterations = getattr(args, "iterations", 50)
+    should_minimize = getattr(args, "minimize", False)
+
+    print(
+        f"\n  {Color.CYAN}+-- [Concurrent Fuzzer] --------------------------------------+{Color.RESET}"
+    )
+    print(f"  |  Target     : {target_exec.name:<45} |")
+    print(
+        f"  |  Oracle     : {(oracle_path.name if oracle_path else 'Crash & limit check'):<45} |"
+    )
+    print(f"  |  Iterations : {iterations:<45} |")
+    print(f"  |  Workers    : {workers:<45} |")
+    print(
+        f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}\n"
+    )
+
+    fuzzer = Fuzzer(
+        target_binary=target_exec,
+        oracle=oracle_path,
+        timeout_ms=args.time_limit,
+        memory_limit_mb=args.memory_limit,
+    )
+    res = fuzzer.run(iterations=iterations, workers=workers)
+
+    if res.found_bug:
+        print(
+            f"  {Color.RED}[BUG DISCOVERED]{Color.RESET} at iteration {res.iterations_run}!"
+        )
+        if res.error_message:
+            print(f"  Error: {res.error_message}")
+        if res.failing_input:
+            failing_inp = res.failing_input
+            if should_minimize:
+                print(
+                    f"\n  {Color.CYAN}[Minimizing]{Color.RESET} Delta-debugging failing input..."
+                )
+                minimizer = Minimizer(
+                    target_binary=target_exec,
+                    oracle=oracle_path,
+                    config=fuzzer.config,
+                )
+                minimized_inp = minimizer.minimize(failing_inp)
+                print(f"  {Color.GREEN}[Minimization complete]{Color.RESET}")
+                print(
+                    f"\n{Color.YELLOW}[Minimal Reproducible Input]{Color.RESET}\n{minimized_inp.rstrip()}"
+                )
+            else:
+                print(
+                    f"\n{Color.YELLOW}[Failing Input]{Color.RESET}\n{failing_inp.rstrip()}"
+                )
+        return 1
+
+    print(
+        f"  {Color.GREEN}[PASS]{Color.RESET} All {iterations} randomized stress iterations completed successfully.\n"
+    )
+    return 0
+
+
 def doctor_command(_args: argparse.Namespace | None = None) -> int:
     """Diagnoses host environment and compiler availability."""
     engine = get_engine()
     engine_name = (
-        "NativeEngine (Rust POSIX / Win32 FFI)"
+        "NativeEngine (Rust POSIX FFI)"
         if isinstance(engine, NativeEngine)
-        else "SubprocessEngine (Universal Zero-Compiler Fallback)"
+        else "SubprocessEngine (Universal Fallback)"
     )
 
     print(
@@ -260,6 +449,13 @@ def doctor_command(_args: argparse.Namespace | None = None) -> int:
     print(f"  |  Platform       : {platform.system()} {platform.release():<37} |")
     print(f"  |  Architecture   : {platform.machine():<45} |")
     print(f"  |  Active Engine  : {engine_name:<45} |")
+
+    update_tag = check_for_updates()
+    if update_tag:
+        print(
+            f"  |  Update Alert  : {Color.YELLOW}★ New version available: v{VERSION} -> {update_tag}{Color.RESET}"
+        )
+
     print(
         f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}"
     )
@@ -282,9 +478,85 @@ def doctor_command(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def uninstall_command(_args: argparse.Namespace | None = None) -> int:
+    """Launches the clean native uninstallation wizard for Aestra."""
+    print(
+        f"\n  {Color.YELLOW}+-- [Aestra Uninstaller Wizard] ------------------------------+{Color.RESET}"
+    )
+    print("  | Cleanly removes Aestra binaries, PATH entries, and shortcuts |")
+    print(
+        f"  {Color.YELLOW}+-------------------------------------------------------------+{Color.RESET}\n"
+    )
+
+    try:
+        confirm = (
+            input(
+                f"  {Color.RED}Are you sure you want to remove Aestra from this system? [y/N]:{Color.RESET} "
+            )
+            .strip()
+            .lower()
+        )
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n  {Color.GRAY}Uninstallation cancelled.{Color.RESET}\n")
+        return 0
+
+    if confirm not in ("y", "yes"):
+        print(f"  {Color.GRAY}Uninstallation cancelled.{Color.RESET}\n")
+        return 0
+
+    print(f"\n  {Color.CYAN}[*] Initiating system uninstallation...{Color.RESET}")
+
+    if sys.platform == "win32":
+        launched_msi = False
+        try:
+            print(
+                f"  {Color.CYAN}[*] Opening Windows Uninstallation Wizard...{Color.RESET}"
+            )
+            res = subprocess.run(
+                ["msiexec.exe", "/x", "{C8B7A124-4B29-4F58-8C61-5B26E50D6B19}"],
+                check=False,
+            )
+            if res.returncode == 0:
+                launched_msi = True
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+        if not launched_msi:
+            try:
+                subprocess.run(
+                    ["cmd.exe", "/c", "start", "ms-settings:appsfeatures"], check=False
+                )
+                print(
+                    f"  {Color.GREEN}[*] Opened Windows Installed Apps. Select 'Aestra' -> 'Uninstall'.{Color.RESET}"
+                )
+            except (OSError, subprocess.SubprocessError):
+                pass
+
+    local_aestra = Path.home() / ".aestra"
+    if local_aestra.exists():
+        shutil.rmtree(local_aestra, ignore_errors=True)
+        print(
+            f"  {Color.GREEN}[OK]{Color.RESET} Cleaned local user directory: {local_aestra}"
+        )
+
+    print(
+        f"\n  {Color.GREEN}[Complete]{Color.RESET} Uninstallation routine finished. Thank you for using Aestra!\n"
+    )
+    return 0
+
+
 def interactive_shell() -> int:
     """Launches an interactive console window for Aestra."""
     print(SHELL_HEADER)
+    update_tag = check_for_updates()
+    if update_tag:
+        print(
+            f"  {Color.YELLOW}+-------------------------------------------------------------+\n"
+            f"  |  {Color.BOLD}★ UPDATE AVAILABLE:{Color.RESET} {Color.YELLOW}v{VERSION} -> {update_tag:<32}{Color.YELLOW}|\n"
+            f"  |  Run 'winget upgrade Aestra' or download from:              |\n"
+            f"  |  https://github.com/Elitsuv/aestra/releases                |\n"
+            f"  +-------------------------------------------------------------+{Color.RESET}\n"
+        )
     engine = get_engine()
     engine_type = (
         "Native FFI" if isinstance(engine, NativeEngine) else "Universal Fallback"
@@ -298,6 +570,7 @@ def interactive_shell() -> int:
   {Color.CYAN}[3]{Color.RESET} {Color.BOLD}Stress & Fuzz{Color.RESET}     - Automated randomized fuzzing against edge cases
   {Color.CYAN}[4]{Color.RESET} {Color.BOLD}System Doctor{Color.RESET}     - Inspect system compilers and environment health
   {Color.CYAN}[5]{Color.RESET} {Color.BOLD}Clean Cache{Color.RESET}       - Wipe local compilation artifacts (.aestra/build)
+  {Color.CYAN}[6]{Color.RESET} {Color.BOLD}Uninstall{Color.RESET}         - Launch native uninstallation wizard
   {Color.CYAN}[0]{Color.RESET} {Color.BOLD}Exit{Color.RESET}              - Quit Aestra
 """
 
@@ -384,34 +657,24 @@ def interactive_shell() -> int:
                     print(f"  {Color.RED}[Error]{Color.RESET} {validation_err}\n")
                     continue
 
-                try:
-                    comp_res = CompilerManager.prepare(path)
-                    target_exec = comp_res.executable_path
-                except CompilationError as e:
-                    print(
-                        f"  {Color.RED}[Compilation Error]{Color.RESET} {e.message}\n"
-                    )
-                    continue
-
                 iter_str = input("  Number of iterations [default: 50]: ").strip()
                 iterations = int(iter_str) if iter_str.isdigit() else 50
+                oracle_str = input(
+                    "  Oracle file (press Enter for crash-only): "
+                ).strip()
+                oracle_val = oracle_str if oracle_str else None
 
-                print(
-                    f"\n  Running {iterations} fuzzing iterations against {target_exec.name}..."
+                ns = argparse.Namespace(
+                    binary=str(path),
+                    oracle=oracle_val,
+                    iterations=iterations,
+                    workers=4,
+                    minimize=True,
+                    time_limit=2000,
+                    memory_limit=512,
                 )
-                fuzzer = Fuzzer(target_binary=target_exec)
-                res = fuzzer.run(iterations=iterations)
-
-                if res.found_bug:
-                    print(
-                        f"  {Color.RED}[BUG DISCOVERED]{Color.RESET} at iteration {res.iterations_run}!"
-                    )
-                    print(f"  Error: {res.error_message}")
-                    print(f"  Failing Input:\n{res.failing_input}")
-                else:
-                    print(
-                        f"  {Color.GREEN}[PASS]{Color.RESET} All {iterations} random stress test iterations passed without crash.\n"
-                    )
+                fuzz_command(ns)
+                print()
 
             elif choice in ("4", "doctor"):
                 doctor_command()
@@ -421,6 +684,9 @@ def interactive_shell() -> int:
                 print(
                     f"  {Color.GREEN}[Cache Cleaned]{Color.RESET} Removed {cleaned} binary artifacts from .aestra/build.\n"
                 )
+
+            elif choice in ("6", "uninstall"):
+                uninstall_command()
 
             else:
                 parts = choice.split()
@@ -481,6 +747,7 @@ def main(argv: list[str] | None = None) -> int:
   aestra doctor                           Inspect toolchains & environment health
   aestra run ./solution.cpp               Run with microsecond telemetry
   aestra test ./solution.py --cases ./in  Run batch test suite
+  aestra fuzz ./solution.py --iterations 100 --workers 4
 """,
     )
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
@@ -533,9 +800,51 @@ def main(argv: list[str] | None = None) -> int:
         help="Memory limit in MB (default: 512)",
     )
 
+    fuzz_parser = subparsers.add_parser(
+        "fuzz", help="Run automated concurrent fuzzing against edge cases"
+    )
+    fuzz_parser.add_argument("binary", help="Path to target binary or source file")
+    fuzz_parser.add_argument(
+        "--oracle",
+        type=str,
+        default=None,
+        help="Path to trusted oracle binary or script for differential checking",
+    )
+    fuzz_parser.add_argument(
+        "--iterations",
+        type=int,
+        default=50,
+        help="Number of randomized fuzzing iterations (default: 50)",
+    )
+    fuzz_parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="Number of concurrent fuzzing worker threads (default: 4)",
+    )
+    fuzz_parser.add_argument(
+        "--minimize",
+        action="store_true",
+        help="Automatically delta-debug minimize failing testcase if a bug is found",
+    )
+    fuzz_parser.add_argument(
+        "--time-limit",
+        type=int,
+        default=2000,
+        help="CPU time limit in ms (default: 2000)",
+    )
+    fuzz_parser.add_argument(
+        "--memory-limit",
+        type=int,
+        default=512,
+        help="Memory limit in MB (default: 512)",
+    )
+
     subparsers.add_parser(
         "doctor", help="Inspect compiler toolchains and sandbox health"
     )
+
+    subparsers.add_parser("uninstall", help="Launch native uninstaller wizard")
 
     subparsers.add_parser("interactive", help="Open the interactive terminal dashboard")
 
@@ -545,8 +854,12 @@ def main(argv: list[str] | None = None) -> int:
         return run_command(args)
     elif args.command == "test":
         return test_command(args)
+    elif args.command == "fuzz":
+        return fuzz_command(args)
     elif args.command == "doctor":
         return doctor_command(args)
+    elif args.command == "uninstall":
+        return uninstall_command(args)
     elif args.command == "interactive":
         return interactive_shell()
     else:

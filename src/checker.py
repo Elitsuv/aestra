@@ -13,6 +13,8 @@ _TOKEN_RE = re.compile(r"\S+")
 
 
 class CheckerMode(str, Enum):
+    """Supported output comparison modes."""
+
     EXACT = "EXACT"
     TOKEN = "TOKEN"
     IGNORE_WHITESPACE = "IGNORE_WHITESPACE"
@@ -20,16 +22,24 @@ class CheckerMode(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class CheckResult:
+    """Outcome of an output verification check."""
+
     is_correct: bool
     diff: str | None = None
 
 
 class BaseChecker(abc.ABC):
+    """Abstract base class for output checkers."""
+
     @abc.abstractmethod
-    def check(self, actual: str, expected: str) -> CheckResult: ...
+    def check(self, actual: str, expected: str) -> CheckResult:
+        """Compares actual output against expected output."""
+        ...
 
 
 class OutputChecker(BaseChecker):
+    """Standard differential output checker with whitespace and token modes."""
+
     __slots__ = ("max_diff", "mode")
 
     def __init__(
@@ -73,6 +83,8 @@ class OutputChecker(BaseChecker):
 
 
 class FloatToleranceChecker(BaseChecker):
+    """Numerical output checker allowing relative or absolute epsilon tolerance."""
+
     __slots__ = ("epsilon",)
 
     def __init__(self, epsilon: float = 1e-4) -> None:
@@ -90,15 +102,30 @@ class FloatToleranceChecker(BaseChecker):
                 return CheckResult(False, f"Token count mismatch at index {idx}")
             try:
                 a_val, e_val = float(a), float(e)
-                if (
-                    math.isnan(a_val)
-                    or math.isnan(e_val)
-                    or abs(a_val - e_val) > self.epsilon
-                ):
-                    return CheckResult(
-                        False,
-                        f"Token {idx} outside epsilon {self.epsilon}: Expected {e}, got {a}",
-                    )
+                if math.isnan(a_val) or math.isnan(e_val):
+                    if not (math.isnan(a_val) and math.isnan(e_val)):
+                        return CheckResult(
+                            False, f"Token {idx} NaN mismatch: Expected {e}, got {a}"
+                        )
+                    continue
+
+                if math.isinf(a_val) or math.isinf(e_val):
+                    if a_val != e_val:
+                        return CheckResult(
+                            False,
+                            f"Token {idx} infinite mismatch: Expected {e}, got {a}",
+                        )
+                    continue
+
+                diff = abs(a_val - e_val)
+                if diff > self.epsilon:
+                    # Also check relative tolerance for large floating-point numbers
+                    rel_tol = self.epsilon * max(abs(a_val), abs(e_val))
+                    if diff > rel_tol:
+                        return CheckResult(
+                            False,
+                            f"Token {idx} outside epsilon {self.epsilon}: Expected {e}, got {a}",
+                        )
             except (ValueError, OverflowError):
                 if a != e:
                     return CheckResult(
@@ -109,6 +136,8 @@ class FloatToleranceChecker(BaseChecker):
 
 
 class CallableChecker(BaseChecker):
+    """Custom verification wrapper around user-defined predicate functions."""
+
     __slots__ = ("_fn",)
 
     def __init__(self, fn: Callable[[str, str], bool | CheckResult]) -> None:
