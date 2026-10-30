@@ -72,55 +72,6 @@ def check_for_updates() -> str | None:
     return None
 
 
-def _parse_version(v: str) -> tuple[int, ...]:
-    clean = v.lstrip("v").strip()
-    try:
-        return tuple(int(x) for x in clean.split("."))
-    except ValueError:
-        return (0, 0, 0)
-
-
-def check_for_updates() -> str | None:
-    """Checks GitHub releases for updates with 24h cache and 1s timeout (0 user data)."""
-    try:
-        cache_dir = Path(".aestra")
-        cache_file = cache_dir / "update_cache.json"
-        now = time.time()
-
-        if cache_file.exists():
-            try:
-                cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
-                if now - cache_data.get("timestamp", 0) < 86400:
-                    cached_tag = str(cache_data.get("latest_tag", ""))
-                    if cached_tag and _parse_version(cached_tag) > _parse_version(VERSION):
-                        return cached_tag
-                    return None
-            except (OSError, ValueError, TypeError, KeyError):
-                pass
-
-        url = "https://api.github.com/repos/Elitsuv/aestra/releases/latest"
-        req = urllib.request.Request(url, headers={"User-Agent": "Aestra-CLI"})
-        with urllib.request.urlopen(req, timeout=1.0) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            latest_tag = str(data.get("tag_name", "")).strip()
-
-            try:
-                cache_dir.mkdir(parents=True, exist_ok=True)
-                cache_file.write_text(
-                    json.dumps({"timestamp": now, "latest_tag": latest_tag}),
-                    encoding="utf-8",
-                )
-            except OSError:
-                pass
-
-            if latest_tag and _parse_version(latest_tag) > _parse_version(VERSION):
-                return latest_tag
-    except (OSError, ValueError, urllib.error.URLError, TimeoutError):
-        pass
-
-    return None
-
-
 def _enable_windows_ansi() -> None:
     """Enables virtual terminal processing on Windows consoles via Win32 API."""
     if sys.platform != "win32":

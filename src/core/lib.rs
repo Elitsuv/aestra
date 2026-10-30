@@ -39,14 +39,7 @@ fn execute_native(
     }
     #[cfg(not(unix))]
     {
-        let _ = (
-            py,
-            command,
-            args,
-            input_data,
-            time_limit_ms,
-            memory_limit_mb,
-        );
+        let _ = (py, command, args, input_data, time_limit_ms, memory_limit_mb);
         Err(pyo3::exceptions::PyOSError::new_err(
             "POSIX execution sandbox is only supported on Linux/Unix systems.",
         ))
@@ -59,4 +52,3 @@ fn aestra_core(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(execute_native, m)?)?;
     Ok(())
 }
-
