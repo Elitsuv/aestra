@@ -10,7 +10,7 @@ from src.checker import BaseChecker, OutputChecker
 from src.config import Config
 from src.engine import BaseEngine, get_engine
 from src.models import ExecutionResult, ExecutionStatus
-from src.runner import BatchResult, BatchRunner, TestCase, TestResult
+from src.runner import BatchResult, BatchRunner, TestCase
 
 
 class Judge:
@@ -50,6 +50,7 @@ class Judge:
         target_binary: str | Path,
         cases_dir: str | Path | None = None,
         test_cases: list[TestCase] | None = None,
+        workers: int = 1,
     ) -> BatchResult:
         """Evaluates target_binary across a test suite (directory or TestCase list)."""
         path = Path(target_binary)
@@ -68,40 +69,17 @@ class Judge:
                 limits,
                 mode=self.config.checker_mode,
                 checker=active_checker,
+                workers=workers,
             )
 
         if test_cases is not None:
-            results: list[TestResult] = []
-            passed = 0
-            total_cpu = 0.0
-            max_ram = 0.0
-            first_failure: str | None = None
-
-            for case in test_cases:
-                res = self.runner.run_case(path, case, limits, active_checker)
-                results.append(res)
-                total_cpu += res.cpu_time_ms
-                max_ram = max(max_ram, res.peak_memory_mb)
-
-                if res.is_accepted:
-                    passed += 1
-                elif first_failure is None:
-                    first_failure = res.verdict
-
-            total = len(test_cases)
-            overall = (
-                "ACCEPTED"
-                if (total > 0 and passed == total)
-                else (first_failure or "NO_TESTS")
-            )
-
-            return BatchResult(
-                passed=passed,
-                total=total,
-                overall_verdict=overall,
-                total_cpu_time_ms=total_cpu,
-                max_peak_memory_mb=max_ram,
-                results=results,
+            return self.runner.evaluate_cases(
+                path,
+                test_cases,
+                limits,
+                mode=self.config.checker_mode,
+                checker=active_checker,
+                workers=workers,
             )
 
         raise ValueError("Either cases_dir or test_cases must be provided.")
