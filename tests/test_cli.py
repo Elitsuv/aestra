@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from src.cli import (
+    _clean_path_input,
     _parse_version,
     check_for_updates,
     doctor_command,
@@ -131,6 +132,38 @@ class CLITests(unittest.TestCase):
     def test_check_for_updates_offline_safe(self) -> None:
         res = check_for_updates()
         self.assertTrue(res is None or isinstance(res, str))
+
+    def test_clean_path_input(self) -> None:
+        self.assertEqual(
+            _clean_path_input("& 'C:\\foo\\bar.cpp'"), Path("C:\\foo\\bar.cpp")
+        )
+        self.assertEqual(
+            _clean_path_input('& "C:\\foo\\bar.cpp"'), Path("C:\\foo\\bar.cpp")
+        )
+        self.assertEqual(
+            _clean_path_input("  'C:\\foo\\bar.cpp'  "), Path("C:\\foo\\bar.cpp")
+        )
+        self.assertEqual(
+            _clean_path_input(Path("C:\\foo\\bar.cpp")), Path("C:\\foo\\bar.cpp")
+        )
+
+    def test_cli_batch_test_with_workers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            sol = folder / "solution.py"
+            sol.write_text("import sys; print(sum(map(int, sys.stdin.read().split())))")
+
+            cases_dir = folder / "cases"
+            cases_dir.mkdir()
+            (cases_dir / "01.in").write_text("10 20\n")
+            (cases_dir / "01.out").write_text("30\n")
+            (cases_dir / "02.in").write_text("5 5\n")
+            (cases_dir / "02.out").write_text("10\n")
+
+            exit_code = cli_main(
+                ["test", str(sol), "--cases", str(cases_dir), "--workers", "2"]
+            )
+            self.assertEqual(exit_code, 0)
 
 
 if __name__ == "__main__":

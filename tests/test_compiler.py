@@ -43,9 +43,13 @@ class CompilerTests(unittest.TestCase):
         CompilerManager.BUILD_DIR.mkdir(parents=True, exist_ok=True)
         dummy_file = CompilerManager.BUILD_DIR / "temp_test_artifact.tmp"
         dummy_file.write_text("test")
+        dummy_subdir = CompilerManager.BUILD_DIR / "temp_subfolder"
+        dummy_subdir.mkdir(exist_ok=True)
+        (dummy_subdir / "nested.tmp").write_text("nested")
         cleaned = CompilerManager.clean_cache()
-        self.assertGreaterEqual(cleaned, 1)
+        self.assertGreaterEqual(cleaned, 2)
         self.assertFalse(dummy_file.exists())
+        self.assertFalse(dummy_subdir.exists())
 
     def test_security_compiler_flag_injection(self) -> None:
         with self.assertRaises(ValueError) as ctx:

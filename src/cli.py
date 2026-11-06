@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -116,8 +117,13 @@ BANNER = f"""{Color.CYAN}{Color.BOLD}{ASCII_LOGO}{Color.RESET}
 SHELL_HEADER = BANNER
 
 
-def _clean_path_input(raw: str) -> Path:
-    cleaned = raw.strip().strip("'").strip('"')
+def _clean_path_input(raw: str | Path) -> Path:
+    if isinstance(raw, Path):
+        return raw
+    cleaned = raw.strip()
+    if cleaned.startswith("&"):
+        cleaned = cleaned[1:].strip()
+    cleaned = cleaned.strip("'").strip('"').strip()
     return Path(cleaned)
 
 
@@ -148,7 +154,7 @@ def _validate_source_file(path: Path) -> str | None:
 
 
 def run_command(args: argparse.Namespace) -> int:
-    raw_path = Path(args.binary)
+    raw_path = _clean_path_input(args.binary)
     validation_err = _validate_source_file(raw_path)
     if validation_err:
         print(f"Error: {validation_err}", file=sys.stderr)
@@ -208,7 +214,7 @@ def run_command(args: argparse.Namespace) -> int:
 
 
 def test_command(args: argparse.Namespace) -> int:
-    raw_path = Path(args.binary)
+    raw_path = _clean_path_input(args.binary)
     validation_err = _validate_source_file(raw_path)
     if validation_err:
         print(f"Error: {validation_err}", file=sys.stderr)
@@ -228,7 +234,7 @@ def test_command(args: argparse.Namespace) -> int:
         )
         return 1
 
-    cases_dir = Path(args.cases)
+    cases_dir = _clean_path_input(args.cases)
     if not cases_dir.is_dir():
         print(f"Error: Cases directory '{cases_dir}' not found.", file=sys.stderr)
         return 1
@@ -254,11 +260,16 @@ def test_command(args: argparse.Namespace) -> int:
         )
         return 1
 
+    workers = getattr(args, "workers", 1) or 1
+    worker_label = f", {workers} workers" if workers > 1 else ""
+
     print(
         f"\n  {Color.CYAN}+-- [Batch Runner] -------------------------------------------+{Color.RESET}"
     )
     print(f"  |  Binary : {source_path.name:<48} |")
-    print(f"  |  Cases  : {f'{len(cases)} testcases from {cases_dir.name}/':<48} |")
+    print(
+        f"  |  Cases  : {f'{len(cases)} testcases from {cases_dir.name}/{worker_label}':<48} |"
+    )
     print(
         f"  |  Limits : {f'{limits.time_limit_ms}ms CPU, {limits.memory_limit_mb}MB RAM':<48} |"
     )
@@ -266,7 +277,11 @@ def test_command(args: argparse.Namespace) -> int:
         f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}\n"
     )
 
-    batch_res = runner.run_batch(source_path, cases_dir, limits, mode=mode)
+    batch_res = (
+        runner.evaluate_cases(source_path, cases, limits, mode=mode, workers=workers)
+        if hasattr(runner, "evaluate_cases")
+        else runner.run_batch(source_path, cases_dir, limits, mode=mode)
+    )
 
     for res in batch_res.results:
         verdict_color = Color.GREEN if res.is_accepted else Color.RED
@@ -298,7 +313,7 @@ def test_command(args: argparse.Namespace) -> int:
 
 
 def fuzz_command(args: argparse.Namespace) -> int:
-    raw_path = Path(args.binary)
+    raw_path = _clean_path_input(args.binary)
     validation_err = _validate_source_file(raw_path)
     if validation_err:
         print(f"Error: {validation_err}", file=sys.stderr)
@@ -311,7 +326,7 @@ def fuzz_command(args: argparse.Namespace) -> int:
         print(f"Error: {e.message}", file=sys.stderr)
         return 1
 
-    oracle_path = Path(args.oracle) if args.oracle else None
+    oracle_path = _clean_path_input(args.oracle) if args.oracle else None
     if oracle_path is not None:
         val_err = _validate_source_file(oracle_path)
         if val_err:
@@ -392,12 +407,18 @@ def doctor_command(_args: argparse.Namespace | None = None) -> int:
         else "SubprocessEngine (Universal Fallback)"
     )
 
+    cpu_cores = os.cpu_count() or 1
+    term_encoding = sys.stdout.encoding or "ascii"
+    color_support = "ANSI Enabled" if Color.RESET != "" else "Disabled"
+
     print(
         f"\n  {Color.CYAN}+-- [System Doctor] ------------------------------------------+{Color.RESET}"
     )
     print(f"  |  Aestra Version : {Color.BOLD}v{VERSION:<41}{Color.RESET} |")
     print(f"  |  Platform       : {platform.system()} {platform.release():<37} |")
     print(f"  |  Architecture   : {platform.machine():<45} |")
+    print(f"  |  Logical CPUs   : {f'{cpu_cores} threads available':<45} |")
+    print(f"  |  Terminal I/O   : {f'{term_encoding} ({color_support})':<45} |")
     print(f"  |  Active Engine  : {engine_name:<45} |")
 
     update_tag = check_for_updates()
@@ -612,9 +633,11 @@ def interactive_shell() -> int:
                 )
                 t_str = input("  Time limit ms [default: 2000]: ").strip()
                 m_str = input("  Memory limit MB [default: 512]: ").strip()
+                w_str = input("  Concurrency workers [default: 1]: ").strip()
 
                 time_limit = int(t_str) if t_str.isdigit() else 2000
                 mem_limit = int(m_str) if m_str.isdigit() else 512
+                workers = int(w_str) if w_str.isdigit() and int(w_str) > 0 else 1
 
                 ns = argparse.Namespace(
                     binary=str(path),
@@ -622,6 +645,7 @@ def interactive_shell() -> int:
                     mode=mode_str,
                     time_limit=time_limit,
                     memory_limit=mem_limit,
+                    workers=workers,
                 )
                 test_command(ns)
                 print()
@@ -775,6 +799,13 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=512,
         help="Memory limit in MB (default: 512)",
+    )
+    test_parser.add_argument(
+        "-w",
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of concurrent test worker threads (default: 1)",
     )
 
     fuzz_parser = subparsers.add_parser(

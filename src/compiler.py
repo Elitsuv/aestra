@@ -115,17 +115,20 @@ class CompilerManager:
 
     @classmethod
     def clean_cache(cls) -> int:
-        """Removes cached compilation binaries from .aestra/build."""
+        """Removes cached compilation binaries and build artifacts from .aestra/build."""
         if not cls.BUILD_DIR.exists():
             return 0
         count = 0
         for item in cls.BUILD_DIR.iterdir():
-            if item.is_file():
-                try:
+            try:
+                if item.is_file() or item.is_symlink():
                     item.unlink()
                     count += 1
-                except OSError:
-                    pass
+                elif item.is_dir():
+                    shutil.rmtree(item, ignore_errors=True)
+                    count += 1
+            except OSError:
+                pass
         return count
 
     @classmethod
