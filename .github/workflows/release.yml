@@ -23,7 +23,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install WiX CLI
-        run: dotnet tool install --global wix --version 4.*
+        run: |
+          dotnet tool install --global wix --version 4.*
+          wix extension add -g WixToolset.UI.wixext
 
       - name: Compile MSI Installer
         run: pwsh -File scripts/build_msi.ps1 -OutDir dist -Version ${{ github.ref_name || inputs.tag_name }}

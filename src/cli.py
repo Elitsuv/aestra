@@ -102,19 +102,18 @@ class Color:
     GRAY = "\033[90m"
 
 
-BANNER = f"""
-  {Color.CYAN}+-------------------------------------------------------------+
-  |  {Color.BOLD}AESTRA{Color.RESET}{Color.CYAN}  *  Deterministic CP Execution Sandbox     {Color.YELLOW}v{VERSION}{Color.CYAN}  |
-  |  Microsecond telemetry & hardware-level resource limits     |
-  +-------------------------------------------------------------+{Color.RESET}
+ASCII_LOGO = r"""
+    ___    ______ _____ _______ ____   ___ 
+   /   |  / ____// ___//_  __// __ \ /   |
+  / /| | / __/   \__ \  / /  / /_/ // /| |
+ / ___ |/ /___  ___/ / / /  / _, _// ___ |
+/_/  |_/_____/ /____/ /_/  /_/ |_|/_/  |_|"""
+
+BANNER = f"""{Color.CYAN}{Color.BOLD}{ASCII_LOGO}{Color.RESET}
+  {Color.GRAY}Deterministic CP Execution Sandbox & Fuzzer  •  {Color.YELLOW}v{VERSION}{Color.RESET}
 """
 
-SHELL_HEADER = f"""
-  {Color.CYAN}+-------------------------------------------------------------+
-  |  {Color.BOLD}AESTRA{Color.RESET}{Color.CYAN}  *  Deterministic CP Execution Sandbox     {Color.YELLOW}v{VERSION}{Color.CYAN}  |
-  |  Microsecond telemetry * Multi-language * Zero PC footprint |
-  +-------------------------------------------------------------+{Color.RESET}
-"""
+SHELL_HEADER = BANNER
 
 
 def _clean_path_input(raw: str) -> Path:
@@ -431,12 +430,20 @@ def doctor_command(_args: argparse.Namespace | None = None) -> int:
 
 def uninstall_command(_args: argparse.Namespace | None = None) -> int:
     """Launches the clean native uninstallation wizard for Aestra."""
+    install_dir = Path(sys.prefix)
+    if not (install_dir / "aestra.bat").exists():
+        fallback_dir = Path.home() / "AppData" / "Local" / "Programs" / "Aestra"
+        if fallback_dir.exists():
+            install_dir = fallback_dir
+
     print(
-        f"\n  {Color.YELLOW}+-- [Aestra Uninstaller Wizard] ------------------------------+{Color.RESET}"
-    )
-    print("  | Cleanly removes Aestra binaries, PATH entries, and shortcuts |")
-    print(
-        f"  {Color.YELLOW}+-------------------------------------------------------------+{Color.RESET}\n"
+        f"\n  {Color.YELLOW}╭─ Aestra Uninstaller Wizard ───────────────────────────────────╮{Color.RESET}\n"
+        f"  {Color.YELLOW}│{Color.RESET}  Cleanly removes Aestra binaries, PATH entries, and shortcuts {Color.YELLOW}│{Color.RESET}\n"
+        f"  {Color.YELLOW}╰───────────────────────────────────────────────────────────────╯{Color.RESET}\n"
+        f"  {Color.GRAY}Installation Footprint:{Color.RESET}\n"
+        f"    • Program Location : {install_dir}\n"
+        f"    • Local User Cache : {Path.home() / '.aestra'}\n"
+        f"    • Environment      : User PATH & Desktop/Start Menu Shortcuts\n"
     )
 
     try:
@@ -502,33 +509,52 @@ def interactive_shell() -> int:
     update_tag = check_for_updates()
     if update_tag:
         print(
-            f"  {Color.YELLOW}+-------------------------------------------------------------+\n"
-            f"  |  {Color.BOLD}★ UPDATE AVAILABLE:{Color.RESET} {Color.YELLOW}v{VERSION} -> {update_tag:<32}{Color.YELLOW}|\n"
-            f"  |  Run 'winget upgrade Aestra' or download from:              |\n"
-            f"  |  https://github.com/Elitsuv/aestra/releases                |\n"
-            f"  +-------------------------------------------------------------+{Color.RESET}\n"
+            f"  {Color.YELLOW}╭───────────────────────────────────────────────────────────────╮\n"
+            f"  │  {Color.BOLD}★ UPDATE AVAILABLE:{Color.RESET} {Color.YELLOW}v{VERSION} -> {update_tag:<32}{Color.YELLOW}│\n"
+            f"  │  Run 'winget upgrade Aestra' or download from:              │\n"
+            f"  │  https://github.com/Elitsuv/aestra/releases                │\n"
+            f"  ╰───────────────────────────────────────────────────────────────╯{Color.RESET}\n"
         )
     engine = get_engine()
-    engine_type = (
-        "Native FFI" if isinstance(engine, NativeEngine) else "Universal Fallback"
+    engine_name = (
+        "NativeEngine (POSIX kernel)"
+        if isinstance(engine, NativeEngine)
+        else "SubprocessEngine (Universal Fallback)"
     )
+    host_info = f"{platform.system()} {platform.machine()} ({platform.python_implementation()} {platform.python_version()})"
     print(
-        f"  Active Sandbox: {Color.GREEN}{engine_type}{Color.RESET} | Python {platform.python_version()} on {platform.system()}\n"
+        f"  {Color.CYAN}╭─ System Environment ──────────────────────────────────────────╮{Color.RESET}\n"
+        f"  {Color.CYAN}│{Color.RESET}  Active Sandbox : {Color.GREEN}{engine_name:<46}{Color.RESET}{Color.CYAN}│{Color.RESET}\n"
+        f"  {Color.CYAN}│{Color.RESET}  Host Platform  : {host_info:<46}{Color.CYAN}│{Color.RESET}\n"
+        f"  {Color.CYAN}╰───────────────────────────────────────────────────────────────╯{Color.RESET}\n"
     )
 
-    menu = f"""  {Color.CYAN}[1]{Color.RESET} {Color.BOLD}Run Solution{Color.RESET}      - Execute source or binary with microsecond telemetry
-  {Color.CYAN}[2]{Color.RESET} {Color.BOLD}Batch Test Suite{Color.RESET}  - Test solution against .in / .out cases directory
-  {Color.CYAN}[3]{Color.RESET} {Color.BOLD}Stress & Fuzz{Color.RESET}     - Automated randomized fuzzing against edge cases
-  {Color.CYAN}[4]{Color.RESET} {Color.BOLD}System Doctor{Color.RESET}     - Inspect system compilers and environment health
-  {Color.CYAN}[5]{Color.RESET} {Color.BOLD}Clean Cache{Color.RESET}       - Wipe local compilation artifacts (.aestra/build)
-  {Color.CYAN}[6]{Color.RESET} {Color.BOLD}Uninstall{Color.RESET}         - Launch native uninstallation wizard
-  {Color.CYAN}[0]{Color.RESET} {Color.BOLD}Exit{Color.RESET}              - Quit Aestra
-"""
+    menu = (
+        f"  {Color.CYAN}╭─ Quick Actions ───────────────────────────────────────────────╮{Color.RESET}\n"
+        f"  {Color.CYAN}│{Color.RESET}  {Color.CYAN}[1]{Color.RESET} {Color.BOLD}Run Solution{Color.RESET}     Benchmark source or binary (.cpp, .py)    {Color.CYAN}│{Color.RESET}\n"
+        f"  {Color.CYAN}│{Color.RESET}  {Color.CYAN}[2]{Color.RESET} {Color.BOLD}Batch Test{Color.RESET}       Test solution against cases/ directory    {Color.CYAN}│{Color.RESET}\n"
+        f"  {Color.CYAN}│{Color.RESET}  {Color.CYAN}[3]{Color.RESET} {Color.BOLD}Stress & Fuzz{Color.RESET}    Auto-fuzz edge cases with DDmin minimizer {Color.CYAN}│{Color.RESET}\n"
+        f"  {Color.CYAN}│{Color.RESET}  {Color.CYAN}[4]{Color.RESET} {Color.BOLD}System Doctor{Color.RESET}    Inspect compilers & toolchain health      {Color.CYAN}│{Color.RESET}\n"
+        f"  {Color.CYAN}│{Color.RESET}  {Color.CYAN}[5]{Color.RESET} {Color.BOLD}Clean Cache{Color.RESET}      Wipe cached binaries (.aestra/build)      {Color.CYAN}│{Color.RESET}\n"
+        f"  {Color.CYAN}│{Color.RESET}  {Color.CYAN}[6]{Color.RESET} {Color.BOLD}Uninstall{Color.RESET}        Launch native uninstallation wizard       {Color.CYAN}│{Color.RESET}\n"
+        f"  {Color.CYAN}│{Color.RESET}  {Color.GRAY}[0] Exit{Color.RESET}                                                       {Color.CYAN}│{Color.RESET}\n"
+        f"  {Color.CYAN}╰───────────────────────────────────────────────────────────────╯{Color.RESET}\n"
+        f"  {Color.YELLOW}✦ Quick Start:{Color.RESET} {Color.GRAY}Type a number {Color.RESET}(1-6){Color.GRAY}, enter a command {Color.RESET}(e.g. doctor){Color.GRAY},\n"
+        f"                 or pass a file path directly {Color.RESET}(e.g. solution.cpp){Color.GRAY}.{Color.RESET}\n"
+    )
+
+    prompt_sym = (
+        "❯"
+        if sys.platform != "win32" or "utf" in (sys.stdout.encoding or "").lower()
+        else ">"
+    )
 
     while True:
         try:
             print(menu)
-            choice = input(f"  {Color.CYAN}{Color.BOLD}aestra>{Color.RESET} ").strip()
+            choice = input(
+                f"  {Color.CYAN}{Color.BOLD}aestra {prompt_sym}{Color.RESET} "
+            ).strip()
             if not choice:
                 continue
 
