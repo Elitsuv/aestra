@@ -45,7 +45,8 @@ $wxsPath = Join-Path $scriptDir "aestra.wxs"
 Write-Host "  [*] Compiling MSI package: $msiVersioned..." -ForegroundColor Cyan
 Push-Location $repoRoot
 try {
-    & wix build $wxsPath -o $msiVersioned
+    & wix extension add -g WixToolset.UI.wixext -ErrorAction SilentlyContinue | Out-Null
+    & wix build -ext WixToolset.UI.wixext $wxsPath -o $msiVersioned
 } finally {
     Pop-Location
 }
