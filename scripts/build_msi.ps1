@@ -54,6 +54,11 @@ Write-Host "  [*] Compiling MSI package: $msiVersioned..." -ForegroundColor Cyan
 Push-Location $repoRoot
 try {
     & wix build $wxsPath -o $msiVersioned
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [!] wix build exited with code $LASTEXITCODE" -ForegroundColor Red
+    }
+} catch {
+    Write-Host "  [!] Exception during wix build: $_" -ForegroundColor Red
 } finally {
     Pop-Location
 }

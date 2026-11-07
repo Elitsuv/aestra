@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Release tag name (e.g. v1.1.0)"
+        description: "Release tag name (e.g. v1.1.2)"
         required: false
         default: "v1.1.2"
 
@@ -23,22 +23,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install WiX CLI
-        shell: pwsh
-        run: |
-          dotnet tool install --global wix --version 4.* --ignore-failed-sources
-          $dotnetTools = Join-Path $env:USERPROFILE ".dotnet\tools"
-          if (Test-Path $dotnetTools) {
-            $dotnetTools | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          }
+        run: dotnet tool install --global wix --version 4.*
 
       - name: Compile MSI Installer
-        shell: pwsh
-        run: |
-          $dotnetTools = Join-Path $env:USERPROFILE ".dotnet\tools"
-          if (Test-Path $dotnetTools) {
-            $env:PATH = "$dotnetTools;$env:PATH"
-          }
-          pwsh -File scripts/build_msi.ps1 -OutDir dist -Version ${{ github.ref_name || inputs.tag_name }}
+        run: pwsh -File scripts/build_msi.ps1 -OutDir dist -Version ${{ github.ref_name || inputs.tag_name }}
 
       - name: Upload MSI Artifact
         uses: actions/upload-artifact@v4
