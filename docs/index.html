@@ -955,6 +955,22 @@ cargo test --all                                              <span class="cm">#
 
   <div class="rel">
     <div class="rel-head">
+      <span class="rel-tag">v1.1.2 Production</span>
+      <span class="rel-date">November 2026</span>
+    </div>
+    <p>Performance, usability, and integration release: multi-worker parallel test runner, in-memory testcase caching, smart directory auto-discovery, and machine-readable JSON output contract.</p>
+    <ul>
+      <li><strong>Parallel Multi-Worker Batch Runner:</strong> High-throughput testcase evaluation via <code>--workers</code> (<code>-w</code>) utilizing multi-core thread pools while maintaining strict deterministic case index ordering.</li>
+      <li><strong>In-Memory TestCase Buffering:</strong> Nanosecond mtime tracking and in-memory testcase caching for files &le; 2MB, reducing disk I/O bottlenecks during stress-testing.</li>
+      <li><strong>Smart Testcase Auto-Discovery:</strong> <code>aestra test &lt;file&gt;</code> automatically detects <code>cases/</code>, <code>testcases/</code>, or <code>tests/</code> without requiring the explicit <code>--cases</code> flag.</li>
+      <li><strong>Machine-Readable JSON Output Contract:</strong> Added <code>--json</code> flag to <code>run</code>, <code>test</code>, <code>fuzz</code>, and <code>doctor</code> for headless automation, CI/CD, and desktop wrappers.</li>
+      <li><strong>Resilient Windows Path Sanitization:</strong> Automatic stripping of PowerShell drag-and-drop artifacts (<code>&amp; '...'</code>) and extraneous quotes across all commands.</li>
+      <li><strong>Comprehensive 64-Test Suite:</strong> 100% test pass rate across parallel workers, JSON serialization, and directory discovery.</li>
+    </ul>
+  </div>
+
+  <div class="rel">
+    <div class="rel-head">
       <span class="rel-tag">v1.1.1 Production</span>
       <span class="rel-date">October 2026</span>
     </div>
