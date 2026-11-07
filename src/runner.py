@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -7,6 +8,8 @@ from src.checker import BaseChecker, CheckerMode, OutputChecker
 from src.config import ExecutionLimits
 from src.engine import BaseEngine, get_engine
 from src.models import ExecutionStatus
+
+MAX_CASE_CACHE_BYTES = 2 * 1024 * 1024  # 2MB in-memory cache boundary
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,14 +21,37 @@ class TestCase:
     expected_output_path: Path | None = None
     input_data: str | None = None
     expected_output: str | None = None
+    _cached_input: str | None = field(default=None, init=False, repr=False)
+    _cached_expected: str | None = field(default=None, init=False, repr=False)
+    _cached_input_mtime: int | None = field(default=None, init=False, repr=False)
+    _cached_expected_mtime: int | None = field(default=None, init=False, repr=False)
 
     def get_input(self) -> str:
         """Retrieves input data from memory or reads from file."""
         if self.input_data is not None:
             return self.input_data
         if self.input_path is not None and self.input_path.is_file():
-            with open(self.input_path, "r", encoding="utf-8", errors="replace") as f:
-                return f.read()
+            try:
+                st = self.input_path.stat()
+                if (
+                    self._cached_input is not None
+                    and self._cached_input_mtime == st.st_mtime_ns
+                ):
+                    return self._cached_input
+                if st.st_size <= MAX_CASE_CACHE_BYTES:
+                    with open(
+                        self.input_path, "r", encoding="utf-8", errors="replace"
+                    ) as f:
+                        content = f.read()
+                    object.__setattr__(self, "_cached_input", content)
+                    object.__setattr__(self, "_cached_input_mtime", st.st_mtime_ns)
+                    return content
+                with open(
+                    self.input_path, "r", encoding="utf-8", errors="replace"
+                ) as f:
+                    return f.read()
+            except OSError:
+                return ""
         return ""
 
     def get_expected_output(self) -> str:
@@ -36,10 +62,30 @@ class TestCase:
             self.expected_output_path is not None
             and self.expected_output_path.is_file()
         ):
-            with open(
-                self.expected_output_path, "r", encoding="utf-8", errors="replace"
-            ) as f:
-                return f.read()
+            try:
+                st = self.expected_output_path.stat()
+                if (
+                    self._cached_expected is not None
+                    and self._cached_expected_mtime == st.st_mtime_ns
+                ):
+                    return self._cached_expected
+                if st.st_size <= MAX_CASE_CACHE_BYTES:
+                    with open(
+                        self.expected_output_path,
+                        "r",
+                        encoding="utf-8",
+                        errors="replace",
+                    ) as f:
+                        content = f.read()
+                    object.__setattr__(self, "_cached_expected", content)
+                    object.__setattr__(self, "_cached_expected_mtime", st.st_mtime_ns)
+                    return content
+                with open(
+                    self.expected_output_path, "r", encoding="utf-8", errors="replace"
+                ) as f:
+                    return f.read()
+            except OSError:
+                return ""
         return ""
 
 
@@ -151,38 +197,85 @@ class BatchRunner:
             is_accepted=False,
         )
 
-    def run_batch(
+    def evaluate_cases(
         self,
         source_path: Path,
-        cases_dir: Path,
+        cases: list[TestCase],
         limits: ExecutionLimits,
         mode: CheckerMode = CheckerMode.TOKEN,
         checker: BaseChecker | None = None,
+        workers: int = 1,
     ) -> BatchResult:
-        """Discovers and runs all testcases in cases_dir, aggregating verdicts."""
-        cases = self.discover_test_cases(cases_dir)
+        """Evaluates a list of testcases sequentially or concurrently."""
         active_checker: BaseChecker = (
             checker if checker is not None else OutputChecker(mode=mode)
         )
 
-        results: list[TestResult] = []
-        passed = 0
-        total_cpu = 0.0
-        max_ram = 0.0
-        first_failure: str | None = None
-
-        for case in cases:
-            res = self.run_case(source_path, case, limits, active_checker)
-            results.append(res)
-            total_cpu += res.cpu_time_ms
-            max_ram = max(max_ram, res.peak_memory_mb)
-
-            if res.is_accepted:
-                passed += 1
-            elif first_failure is None:
-                first_failure = res.verdict
-
         total = len(cases)
+        if total == 0:
+            return BatchResult(
+                passed=0,
+                total=0,
+                overall_verdict="NO_TESTS",
+                total_cpu_time_ms=0.0,
+                max_peak_memory_mb=0.0,
+                results=[],
+            )
+
+        if workers <= 1 or total <= 1:
+            results: list[TestResult] = []
+            passed = 0
+            total_cpu = 0.0
+            max_ram = 0.0
+            first_failure: str | None = None
+
+            for case in cases:
+                res = self.run_case(source_path, case, limits, active_checker)
+                results.append(res)
+                total_cpu += res.cpu_time_ms
+                max_ram = max(max_ram, res.peak_memory_mb)
+
+                if res.is_accepted:
+                    passed += 1
+                elif first_failure is None:
+                    first_failure = res.verdict
+
+            overall = (
+                "ACCEPTED"
+                if (total > 0 and passed == total)
+                else (first_failure or "NO_TESTS")
+            )
+            return BatchResult(
+                passed=passed,
+                total=total,
+                overall_verdict=overall,
+                total_cpu_time_ms=total_cpu,
+                max_peak_memory_mb=max_ram,
+                results=results,
+            )
+
+        # Multi-worker parallel execution
+        effective_workers = max(1, min(workers, total, 32))
+        indexed_results: list[tuple[int, TestResult]] = []
+
+        def _worker_task(item: tuple[int, TestCase]) -> tuple[int, TestResult]:
+            idx, c = item
+            return idx, self.run_case(source_path, c, limits, active_checker)
+
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=effective_workers
+        ) as executor:
+            indexed_results = list(executor.map(_worker_task, enumerate(cases)))
+
+        indexed_results.sort(key=lambda x: x[0])
+        ordered_results = [res for _, res in indexed_results]
+
+        passed = sum(1 for r in ordered_results if r.is_accepted)
+        total_cpu = sum(r.cpu_time_ms for r in ordered_results)
+        max_ram = max((r.peak_memory_mb for r in ordered_results), default=0.0)
+        first_failure = next(
+            (r.verdict for r in ordered_results if not r.is_accepted), None
+        )
         overall = (
             "ACCEPTED"
             if (total > 0 and passed == total)
@@ -195,5 +288,25 @@ class BatchRunner:
             overall_verdict=overall,
             total_cpu_time_ms=total_cpu,
             max_peak_memory_mb=max_ram,
-            results=results,
+            results=ordered_results,
+        )
+
+    def run_batch(
+        self,
+        source_path: Path,
+        cases_dir: Path,
+        limits: ExecutionLimits,
+        mode: CheckerMode = CheckerMode.TOKEN,
+        checker: BaseChecker | None = None,
+        workers: int = 1,
+    ) -> BatchResult:
+        """Discovers and runs all testcases in cases_dir, aggregating verdicts."""
+        cases = self.discover_test_cases(cases_dir)
+        return self.evaluate_cases(
+            source_path=source_path,
+            cases=cases,
+            limits=limits,
+            mode=mode,
+            checker=checker,
+            workers=workers,
         )

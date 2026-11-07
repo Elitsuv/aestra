@@ -8,6 +8,7 @@ from src.checker import CheckerMode, OutputChecker
 from src.config import ExecutionLimits
 from src.engine import MockEngine
 from src.runner import BatchRunner, TestCase
+from src.sdk import Judge
 
 
 class RunnerTests(unittest.TestCase):
@@ -130,6 +131,100 @@ class RunnerTests(unittest.TestCase):
             self.assertIn("01.in", case_names)
             if symlink_created:
                 self.assertNotIn("02.in", case_names)
+
+    def test_runner_parallel_execution(self) -> None:
+        mock_engine = MockEngine()
+        runner = BatchRunner(engine=mock_engine)
+        limits = ExecutionLimits()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            source_file = folder / "sol.py"
+            source_file.write_text("# STATUS: OK\n", encoding="utf-8")
+
+            cases: list[TestCase] = []
+            for i in range(1, 9):
+                in_f = folder / f"{i:02d}.in"
+                out_f = folder / f"{i:02d}.out"
+                in_f.write_text(f"inp_{i}", encoding="utf-8")
+                out_f.write_text("Simulated output.", encoding="utf-8")
+                cases.append(
+                    TestCase(
+                        name=f"{i:02d}.in", input_path=in_f, expected_output_path=out_f
+                    )
+                )
+
+            batch_res = runner.evaluate_cases(source_file, cases, limits, workers=4)
+            self.assertEqual(batch_res.total, 8)
+            self.assertEqual(batch_res.passed, 8)
+            self.assertEqual(batch_res.overall_verdict, "ACCEPTED")
+            # Verify exact ordering preserved
+            self.assertEqual(
+                [r.case_name for r in batch_res.results],
+                [f"{i:02d}.in" for i in range(1, 9)],
+            )
+
+    def test_case_caching_and_invalidation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            in_file = folder / "test.in"
+            out_file = folder / "test.out"
+            in_file.write_text("initial input", encoding="utf-8")
+            out_file.write_text("initial output", encoding="utf-8")
+
+            case = TestCase(
+                name="test.in", input_path=in_file, expected_output_path=out_file
+            )
+            self.assertEqual(case.get_input(), "initial input")
+            self.assertEqual(case.get_expected_output(), "initial output")
+
+            # Calling again returns cached data
+            self.assertEqual(case.get_input(), "initial input")
+            self.assertEqual(case.get_expected_output(), "initial output")
+
+            # Updating file on disk modifies mtime and invalidates cache
+            import time
+
+            time.sleep(0.01)  # Ensure mtime_ns advances
+            in_file.write_text("updated input", encoding="utf-8")
+            out_file.write_text("updated output", encoding="utf-8")
+
+            self.assertEqual(case.get_input(), "updated input")
+            self.assertEqual(case.get_expected_output(), "updated output")
+
+    def test_judge_parallel_workers(self) -> None:
+        mock_engine = MockEngine()
+        judge = Judge(engine=mock_engine)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            source_file = folder / "sol.py"
+            source_file.write_text("# STATUS: OK\n", encoding="utf-8")
+
+            cases_dir = folder / "cases"
+            cases_dir.mkdir()
+            (cases_dir / "01.in").write_text("1")
+            (cases_dir / "01.out").write_text("Simulated output.")
+            (cases_dir / "02.in").write_text("2")
+            (cases_dir / "02.out").write_text("Simulated output.")
+
+            # Test run with cases_dir and workers=2
+            res1 = judge.run(source_file, cases_dir=cases_dir, workers=2)
+            self.assertEqual(res1.total, 2)
+            self.assertEqual(res1.passed, 2)
+
+            # Test run with test_cases and workers=2
+            cases = [
+                TestCase(
+                    name="c1", input_data="a", expected_output="Simulated output."
+                ),
+                TestCase(
+                    name="c2", input_data="b", expected_output="Simulated output."
+                ),
+            ]
+            res2 = judge.run(source_file, test_cases=cases, workers=2)
+            self.assertEqual(res2.total, 2)
+            self.assertEqual(res2.passed, 2)
 
 
 if __name__ == "__main__":
