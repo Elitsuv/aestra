@@ -19,7 +19,27 @@ from src.engine import NativeEngine, get_engine
 from src.runner import BatchRunner
 from src.sdk import Fuzzer, Minimizer
 
-VERSION = "1.1.1"
+VERSION = "1.1.2"
+
+
+def _discover_default_cases_dir(source_path: Path) -> Path | None:
+    """Finds default testcases directory ('cases', 'testcases', 'tests') relative to source or cwd."""
+    candidates = ["cases", "testcases", "tests"]
+    # Check adjacent to the source file first
+    source_parent = source_path.resolve().parent
+    for name in candidates:
+        candidate = source_parent / name
+        if candidate.is_dir():
+            return candidate
+
+    # Check relative to current working directory
+    cwd = Path.cwd()
+    for name in candidates:
+        candidate = cwd / name
+        if candidate.is_dir():
+            return candidate
+
+    return None
 
 
 def _parse_version(v: str) -> tuple[int, ...]:
@@ -183,6 +203,20 @@ def run_command(args: argparse.Namespace) -> int:
     input_data = args.input if args.input is not None else ""
     result = engine.execute(source_path, limits, input_data=input_data)
 
+    if getattr(args, "json", False):
+        payload = {
+            "status": result.status.value,
+            "is_success": result.is_success,
+            "cpu_time_ms": round(result.cpu_time_ms, 2),
+            "peak_memory_mb": round(result.peak_memory_mb, 2),
+            "exit_code": result.exit_code,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "error_message": result.error_message,
+        }
+        print(json.dumps(payload, indent=2))
+        return 0 if result.is_success else 1
+
     status_color = Color.GREEN if result.is_success else Color.RED
     print(
         f"\n  {Color.CYAN}+-- [Telemetry] ----------------------------------------------+{Color.RESET}"
@@ -234,7 +268,21 @@ def test_command(args: argparse.Namespace) -> int:
         )
         return 1
 
-    cases_dir = _clean_path_input(args.cases)
+    cases_dir_arg = getattr(args, "cases", None)
+    if cases_dir_arg:
+        cases_dir = _clean_path_input(cases_dir_arg)
+    else:
+        discovered = _discover_default_cases_dir(raw_path)
+        if discovered is not None:
+            cases_dir = discovered
+        else:
+            print(
+                "Error: No cases directory specified with --cases, and none of "
+                "('cases/', 'testcases/', 'tests/') were auto-discovered.",
+                file=sys.stderr,
+            )
+            return 1
+
     if not cases_dir.is_dir():
         print(f"Error: Cases directory '{cases_dir}' not found.", file=sys.stderr)
         return 1
@@ -262,6 +310,36 @@ def test_command(args: argparse.Namespace) -> int:
 
     workers = getattr(args, "workers", 1) or 1
     worker_label = f", {workers} workers" if workers > 1 else ""
+
+    if getattr(args, "json", False):
+        batch_res = (
+            runner.evaluate_cases(
+                source_path, cases, limits, mode=mode, workers=workers
+            )
+            if hasattr(runner, "evaluate_cases")
+            else runner.run_batch(source_path, cases_dir, limits, mode=mode)
+        )
+        payload = {
+            "overall_verdict": batch_res.overall_verdict,
+            "passed": batch_res.passed,
+            "total": batch_res.total,
+            "total_cpu_time_ms": round(batch_res.total_cpu_time_ms, 2),
+            "max_peak_memory_mb": round(batch_res.max_peak_memory_mb, 2),
+            "is_all_passed": batch_res.passed == batch_res.total,
+            "results": [
+                {
+                    "case_name": r.case_name,
+                    "verdict": r.verdict,
+                    "cpu_time_ms": round(r.cpu_time_ms, 2),
+                    "peak_memory_mb": round(r.peak_memory_mb, 2),
+                    "diff": r.diff,
+                    "is_accepted": r.is_accepted,
+                }
+                for r in batch_res.results
+            ],
+        }
+        print(json.dumps(payload, indent=2))
+        return 0 if batch_res.passed == batch_res.total else 1
 
     print(
         f"\n  {Color.CYAN}+-- [Batch Runner] -------------------------------------------+{Color.RESET}"
@@ -364,6 +442,27 @@ def fuzz_command(args: argparse.Namespace) -> int:
     )
     res = fuzzer.run(iterations=iterations, workers=workers)
 
+    minimized_inp: str | None = None
+    if res.found_bug and res.failing_input and should_minimize:
+        minimizer = Minimizer(
+            target_binary=target_exec,
+            oracle=oracle_path,
+            config=fuzzer.config,
+        )
+        minimized_inp = minimizer.minimize(res.failing_input)
+
+    if getattr(args, "json", False):
+        payload = {
+            "found_bug": res.found_bug,
+            "iterations_run": res.iterations_run,
+            "failing_input": res.failing_input,
+            "minimized_input": minimized_inp,
+            "oracle_output": res.oracle_output,
+            "error_message": res.error_message,
+        }
+        print(json.dumps(payload, indent=2))
+        return 1 if res.found_bug else 0
+
     if res.found_bug:
         print(
             f"  {Color.RED}[BUG DISCOVERED]{Color.RESET} at iteration {res.iterations_run}!"
@@ -372,16 +471,10 @@ def fuzz_command(args: argparse.Namespace) -> int:
             print(f"  Error: {res.error_message}")
         if res.failing_input:
             failing_inp = res.failing_input
-            if should_minimize:
+            if should_minimize and minimized_inp is not None:
                 print(
                     f"\n  {Color.CYAN}[Minimizing]{Color.RESET} Delta-debugging failing input..."
                 )
-                minimizer = Minimizer(
-                    target_binary=target_exec,
-                    oracle=oracle_path,
-                    config=fuzzer.config,
-                )
-                minimized_inp = minimizer.minimize(failing_inp)
                 print(f"  {Color.GREEN}[Minimization complete]{Color.RESET}")
                 print(
                     f"\n{Color.YELLOW}[Minimal Reproducible Input]{Color.RESET}\n{minimized_inp.rstrip()}"
@@ -398,7 +491,7 @@ def fuzz_command(args: argparse.Namespace) -> int:
     return 0
 
 
-def doctor_command(_args: argparse.Namespace | None = None) -> int:
+def doctor_command(args: argparse.Namespace | None = None) -> int:
     """Diagnoses host environment and compiler availability."""
     engine = get_engine()
     engine_name = (
@@ -410,6 +503,27 @@ def doctor_command(_args: argparse.Namespace | None = None) -> int:
     cpu_cores = os.cpu_count() or 1
     term_encoding = sys.stdout.encoding or "ascii"
     color_support = "ANSI Enabled" if Color.RESET != "" else "Disabled"
+    compilers = CompilerManager.detect_compilers()
+    cache_dir = CompilerManager.BUILD_DIR
+    cache_count = len(list(cache_dir.glob("*.*"))) if cache_dir.is_dir() else 0
+    update_tag = check_for_updates()
+
+    if args is not None and getattr(args, "json", False):
+        payload = {
+            "version": VERSION,
+            "platform": platform.system(),
+            "release": platform.release(),
+            "architecture": platform.machine(),
+            "logical_cpus": cpu_cores,
+            "terminal_encoding": term_encoding,
+            "color_support": color_support == "ANSI Enabled",
+            "active_engine": engine_name,
+            "compilers": compilers,
+            "build_cache_count": cache_count,
+            "update_available": update_tag,
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
 
     print(
         f"\n  {Color.CYAN}+-- [System Doctor] ------------------------------------------+{Color.RESET}"
@@ -421,7 +535,6 @@ def doctor_command(_args: argparse.Namespace | None = None) -> int:
     print(f"  |  Terminal I/O   : {f'{term_encoding} ({color_support})':<45} |")
     print(f"  |  Active Engine  : {engine_name:<45} |")
 
-    update_tag = check_for_updates()
     if update_tag:
         print(
             f"  |  Update Alert  : {Color.YELLOW}★ New version available: v{VERSION} -> {update_tag}{Color.RESET}"
@@ -432,7 +545,6 @@ def doctor_command(_args: argparse.Namespace | None = None) -> int:
     )
     print("  | Detected Toolchains & Compilers:")
 
-    compilers = CompilerManager.detect_compilers()
     for name, path in compilers.items():
         if path:
             status = f"{Color.GREEN}Ready ({path}){Color.RESET}"
@@ -440,8 +552,6 @@ def doctor_command(_args: argparse.Namespace | None = None) -> int:
             status = f"{Color.GRAY}Not Found{Color.RESET}"
         print(f"  |  - {name:<10} : {status}")
 
-    cache_dir = CompilerManager.BUILD_DIR
-    cache_count = len(list(cache_dir.glob("*.*"))) if cache_dir.is_dir() else 0
     print(f"  |  Build Cache    : {cache_count} binaries in {cache_dir}")
     print(
         f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}\n"
@@ -772,6 +882,11 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument(
         "--input", type=str, default=None, help="Input string to pass via stdin"
     )
+    run_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit structured JSON telemetry payload to stdout",
+    )
 
     test_parser = subparsers.add_parser(
         "test", help="Run batch test cases against a binary or source file"
@@ -779,8 +894,9 @@ def main(argv: list[str] | None = None) -> int:
     test_parser.add_argument("binary", help="Path to executable binary or source file")
     test_parser.add_argument(
         "--cases",
-        required=True,
-        help="Directory containing test cases (*.in with *.out/*.ans)",
+        required=False,
+        default=None,
+        help="Directory containing test cases (*.in with *.out/*.ans). Auto-discovered if omitted.",
     )
     test_parser.add_argument(
         "--mode",
@@ -806,6 +922,11 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=1,
         help="Number of concurrent test worker threads (default: 1)",
+    )
+    test_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit structured JSON batch evaluation report to stdout",
     )
 
     fuzz_parser = subparsers.add_parser(
@@ -836,6 +957,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Automatically delta-debug minimize failing testcase if a bug is found",
     )
     fuzz_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit structured JSON fuzzing report to stdout",
+    )
+    fuzz_parser.add_argument(
         "--time-limit",
         type=int,
         default=2000,
@@ -848,8 +974,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Memory limit in MB (default: 512)",
     )
 
-    subparsers.add_parser(
+    doctor_parser = subparsers.add_parser(
         "doctor", help="Inspect compiler toolchains and sandbox health"
+    )
+    doctor_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit structured JSON environment telemetry to stdout",
     )
 
     subparsers.add_parser("uninstall", help="Launch native uninstaller wizard")
