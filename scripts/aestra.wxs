@@ -2,7 +2,7 @@
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="Aestra"
            Manufacturer="Suvro Bhowmick"
-           Version="1.1.1"
+           Version="1.1.2"
            UpgradeCode="C8B7A124-4B29-4F58-8C61-5B26E50D6B19"
            Scope="perUserOrMachine">
 
