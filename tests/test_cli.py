@@ -8,6 +8,7 @@ from pathlib import Path
 
 from src.cli import (
     _clean_path_input,
+    _discover_default_cases_dir,
     _parse_version,
     check_for_updates,
     doctor_command,
@@ -164,6 +165,53 @@ class CLITests(unittest.TestCase):
                 ["test", str(sol), "--cases", str(cases_dir), "--workers", "2"]
             )
             self.assertEqual(exit_code, 0)
+
+    def test_cli_smart_cases_auto_discovery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            sol = folder / "solution.py"
+            sol.write_text("import sys; print(sum(map(int, sys.stdin.read().split())))")
+
+            cases_dir = folder / "cases"
+            cases_dir.mkdir()
+            (cases_dir / "01.in").write_text("10 20\n")
+            (cases_dir / "01.out").write_text("30\n")
+
+            discovered = _discover_default_cases_dir(sol)
+            self.assertEqual(discovered, cases_dir)
+
+            # Invoking `aestra test` without `--cases` uses auto-discovery
+            exit_code = cli_main(["test", str(sol)])
+            self.assertEqual(exit_code, 0)
+
+    def test_cli_json_flags(self) -> None:
+        import io
+        import json
+        from contextlib import redirect_stdout
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            sol = folder / "solution.py"
+            sol.write_text("import sys; print('TEST_OK')")
+
+            # Test run --json
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                exit_code = cli_main(["run", str(sol), "--json"])
+            self.assertEqual(exit_code, 0)
+            data = json.loads(buf.getvalue())
+            self.assertEqual(data["status"], "OK")
+            self.assertTrue(data["is_success"])
+            self.assertIn("TEST_OK", data["stdout"])
+
+            # Test doctor --json
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                exit_code = cli_main(["doctor", "--json"])
+            self.assertEqual(exit_code, 0)
+            doc_data = json.loads(buf.getvalue())
+            self.assertEqual(doc_data["version"], "1.1.2")
+            self.assertIn("compilers", doc_data)
 
 
 if __name__ == "__main__":
