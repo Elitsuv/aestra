@@ -19,6 +19,11 @@ if (-not (Test-Path $targetOutDir)) {
     New-Item -ItemType Directory -Force -Path $targetOutDir | Out-Null
 }
 
+$dotnetTools = Join-Path $env:USERPROFILE ".dotnet\tools"
+if (Test-Path $dotnetTools -and ($env:PATH -notlike "*$dotnetTools*")) {
+    $env:PATH = "$dotnetTools;$env:PATH"
+}
+
 $wixCmd = Get-Command wix -ErrorAction SilentlyContinue
 
 if (-not $wixCmd) {
@@ -27,6 +32,9 @@ if (-not $wixCmd) {
     if ($dotnetCmd) {
         Write-Host "  [*] Installing WiX CLI via dotnet tool..." -ForegroundColor Cyan
         & dotnet tool install --global wix --version 4.* -ErrorAction SilentlyContinue
+        if (Test-Path $dotnetTools -and ($env:PATH -notlike "*$dotnetTools*")) {
+            $env:PATH = "$dotnetTools;$env:PATH"
+        }
         $wixCmd = Get-Command wix -ErrorAction SilentlyContinue
     }
 }
@@ -45,8 +53,7 @@ $wxsPath = Join-Path $scriptDir "aestra.wxs"
 Write-Host "  [*] Compiling MSI package: $msiVersioned..." -ForegroundColor Cyan
 Push-Location $repoRoot
 try {
-    & wix extension add -g WixToolset.UI.wixext -ErrorAction SilentlyContinue | Out-Null
-    & wix build -ext WixToolset.UI.wixext $wxsPath -o $msiVersioned
+    & wix build $wxsPath -o $msiVersioned
 } finally {
     Pop-Location
 }
