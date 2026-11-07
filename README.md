@@ -98,17 +98,21 @@ Output:
 
 ### 2. Batch Test Suite Evaluation
 
-Test your solution against a directory containing matching `*.in` and `*.out` (or `*.ans`) files:
+Test your solution against testcases with parallel multi-worker execution and automatic directory discovery:
 
 ```bash
-aestra test solution.py --cases ./cases --mode token
+# Auto-discovers ./cases, ./testcases, or ./tests if --cases is omitted:
+aestra test solution.py --workers 4
+
+# Or specify custom cases directory and comparison mode:
+aestra test solution.py --cases ./cases --workers 4 --mode token
 ```
 
 Output:
 ```text
   +-- [Batch Runner] -------------------------------------------+
   |  Binary : solution.py                                      |
-  |  Cases  : 3 testcases from cases/                          |
+  |  Cases  : 8 testcases from cases/, 4 workers               |
   |  Limits : 2000ms CPU, 512MB RAM                            |
   +-------------------------------------------------------------+
 
@@ -123,6 +127,16 @@ Output:
   =============================================================
   Summary: 2/3 accepted (FAILED) * 52.4ms * 9.9MB
   =============================================================
+```
+
+### 3. Machine Integration (--json Contract)
+
+Aestra emits structured JSON output across all commands for scriptability, external judge harnesses, and desktop frontends:
+
+```bash
+aestra test solution.py --json
+aestra run solution.cpp --json
+aestra doctor --json
 ```
 
 ### 3. Concurrent Fuzzing & Automated Minimization

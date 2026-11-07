@@ -55,7 +55,11 @@ SUM: 85 | MAX: 30
 Open your terminal in your problem directory and run:
 
 ```bash
-aestra test solution.cpp --cases cases
+# Auto-discovers cases/ folder automatically:
+aestra test solution.cpp
+
+# Or specify custom directory and parallel workers for multi-core speedup:
+aestra test solution.cpp --cases cases --workers 4
 ```
 
 *(You can test `.cpp`, `.py`, `.rs`, `.go`, or `.exe` files. Aestra automatically compiles C++, Rust, and Go in milliseconds with built-in caching!)*
@@ -64,7 +68,7 @@ aestra test solution.cpp --cases cases
 ```text
   +-- [Batch Runner] -------------------------------------------+
   |  Binary : solution.exe                                      |
-  |  Cases  : 2 testcases from cases/                           |
+  |  Cases  : 2 testcases from cases/, 4 workers                |
   |  Limits : 2000ms CPU, 512MB RAM                             |
   +-------------------------------------------------------------+
 
@@ -72,6 +76,16 @@ aestra test solution.cpp --cases cases
   [ACCEPTED]        02.in          12.8ms    3.2MB
 
   Summary: 2/2 accepted (ALL PASSED)
+```
+
+### Method B: Machine Integration & Scripts (`--json`)
+
+If you are wrapping Aestra in a script, VS Code task runner, or desktop application, use `--json`:
+
+```bash
+aestra test solution.cpp --json
+aestra run solution.cpp --json
+aestra doctor --json
 ```
 
 ---
