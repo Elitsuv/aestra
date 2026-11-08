@@ -106,6 +106,21 @@ aestra test solution.cpp --mode exact
 aestra test solution.cpp --mode ignore_whitespace
 ```
 
+### Method D: Accessibility & CI/CD Pipelines (`--no-color` / `NO_COLOR`)
+
+For continuous integration (CI) environments, log aggregators, or monochrome terminals, Aestra supports the [NO_COLOR standard](https://no-color.org) and the `--no-color` flag:
+
+```bash
+# Disable ANSI color formatting via flag:
+aestra run solution.cpp --no-color
+aestra test solution.cpp --no-color
+
+# Or globally via the standard NO_COLOR environment variable:
+export NO_COLOR=1     # Linux / macOS
+$env:NO_COLOR = "1"   # Windows PowerShell
+aestra run solution.cpp
+```
+
 ---
 
 ### Method B: Interactive Terminal (Zero Typing / Drag-and-Drop)

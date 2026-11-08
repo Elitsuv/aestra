@@ -122,6 +122,44 @@ class Color:
     WHITE = "\033[97m"
     GRAY = "\033[90m"
 
+    _enabled: bool = True
+
+    @classmethod
+    def is_enabled(cls) -> bool:
+        return cls._enabled
+
+    @classmethod
+    def disable(cls) -> None:
+        cls._enabled = False
+        cls.RESET = ""
+        cls.BOLD = ""
+        cls.DIM = ""
+        cls.RED = ""
+        cls.GREEN = ""
+        cls.YELLOW = ""
+        cls.BLUE = ""
+        cls.MAGENTA = ""
+        cls.CYAN = ""
+        cls.WHITE = ""
+        cls.GRAY = ""
+        _refresh_banner()
+
+    @classmethod
+    def enable(cls) -> None:
+        cls._enabled = True
+        cls.RESET = "\033[0m"
+        cls.BOLD = "\033[1m"
+        cls.DIM = "\033[2m"
+        cls.RED = "\033[91m"
+        cls.GREEN = "\033[92m"
+        cls.YELLOW = "\033[93m"
+        cls.BLUE = "\033[94m"
+        cls.MAGENTA = "\033[95m"
+        cls.CYAN = "\033[96m"
+        cls.WHITE = "\033[97m"
+        cls.GRAY = "\033[90m"
+        _refresh_banner()
+
 
 ASCII_LOGO = r"""
     ___    ______ _____ _______ ____   ___ 
@@ -135,6 +173,18 @@ BANNER = f"""{Color.CYAN}{Color.BOLD}{ASCII_LOGO}{Color.RESET}
 """
 
 SHELL_HEADER = BANNER
+
+
+def _refresh_banner() -> None:
+    global BANNER, SHELL_HEADER
+    BANNER = f"""{Color.CYAN}{Color.BOLD}{ASCII_LOGO}{Color.RESET}
+  {Color.GRAY}Deterministic CP Execution Sandbox & Fuzzer  •  {Color.YELLOW}v{VERSION}{Color.RESET}
+"""
+    SHELL_HEADER = BANNER
+
+
+if os.environ.get("NO_COLOR") is not None:
+    Color.disable()
 
 
 def _clean_path_input(raw: str | Path) -> Path:
@@ -887,18 +937,32 @@ def interactive_shell() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    _enable_windows_ansi()
-
     if argv is None:
         argv = sys.argv[1:]
 
-    if not argv:
+    has_no_color = "--no-color" in argv or os.environ.get("NO_COLOR") is not None
+    if has_no_color:
+        Color.disable()
+    else:
+        Color.enable()
+        _enable_windows_ansi()
+
+    filtered_for_shell = [a for a in argv if a != "--no-color"]
+    if not filtered_for_shell:
         return interactive_shell()
+
+    color_parser = argparse.ArgumentParser(add_help=False)
+    color_parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable ANSI color formatting in console output",
+    )
 
     parser = argparse.ArgumentParser(
         prog="aestra",
         description=f"Aestra v{VERSION} - Deterministic execution sandbox for competitive programming",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        parents=[color_parser],
         epilog="""Examples:
   aestra                                  Launch interactive shell
   aestra doctor                           Inspect toolchains & environment health
@@ -910,7 +974,9 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
     run_parser = subparsers.add_parser(
-        "run", help="Run a binary or source file under hardware resource limits"
+        "run",
+        help="Run a binary or source file under hardware resource limits",
+        parents=[color_parser],
     )
     run_parser.add_argument("binary", help="Path to executable binary or source file")
     run_parser.add_argument(
@@ -935,7 +1001,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     test_parser = subparsers.add_parser(
-        "test", help="Run batch test cases against a binary or source file"
+        "test",
+        help="Run batch test cases against a binary or source file",
+        parents=[color_parser],
     )
     test_parser.add_argument("binary", help="Path to executable binary or source file")
     test_parser.add_argument(
@@ -982,7 +1050,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     fuzz_parser = subparsers.add_parser(
-        "fuzz", help="Run automated concurrent fuzzing against edge cases"
+        "fuzz",
+        help="Run automated concurrent fuzzing against edge cases",
+        parents=[color_parser],
     )
     fuzz_parser.add_argument("binary", help="Path to target binary or source file")
     fuzz_parser.add_argument(
@@ -1039,7 +1109,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     doctor_parser = subparsers.add_parser(
-        "doctor", help="Inspect compiler toolchains and sandbox health"
+        "doctor",
+        help="Inspect compiler toolchains and sandbox health",
+        parents=[color_parser],
     )
     doctor_parser.add_argument(
         "--json",
@@ -1047,11 +1119,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Emit structured JSON environment telemetry to stdout",
     )
 
-    subparsers.add_parser("uninstall", help="Launch native uninstaller wizard")
+    subparsers.add_parser(
+        "uninstall",
+        help="Launch native uninstaller wizard",
+        parents=[color_parser],
+    )
 
-    subparsers.add_parser("interactive", help="Open the interactive terminal dashboard")
+    subparsers.add_parser(
+        "interactive",
+        help="Open the interactive terminal dashboard",
+        parents=[color_parser],
+    )
 
     args = parser.parse_args(argv)
+    if getattr(args, "no_color", False):
+        Color.disable()
 
     if args.command == "run":
         return run_command(args)
