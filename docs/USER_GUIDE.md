@@ -88,6 +88,24 @@ aestra run solution.cpp --json
 aestra doctor --json
 ```
 
+### Method C: Output Comparison Modes & Floating-Point Tolerance
+
+By default, Aestra compares output tokens ignoring trailing spaces and newlines (`--mode token`). For geometry, physics, or probability problems requiring numerical tolerance:
+
+```bash
+# Floating-point numerical tolerance (default epsilon: 1e-4):
+aestra test solution.cpp --mode float
+
+# Custom floating-point epsilon tolerance (e.g., 1e-6):
+aestra test solution.cpp --mode float --epsilon 1e-6
+
+# Strict character-by-character comparison:
+aestra test solution.cpp --mode exact
+
+# Ignore all whitespace differences:
+aestra test solution.cpp --mode ignore_whitespace
+```
+
 ---
 
 ### Method B: Interactive Terminal (Zero Typing / Drag-and-Drop)
