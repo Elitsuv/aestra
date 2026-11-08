@@ -16,6 +16,21 @@ from src.models import ExecutionResult, ExecutionStatus
 class BaseEngine(abc.ABC):
     """Abstract execution engine interface."""
 
+    @property
+    def engine_name(self) -> str:
+        """Returns the engine identifier ('native', 'fallback', or 'mock')."""
+        return "base"
+
+    @property
+    def precision_disclosure(self) -> str:
+        """Returns telemetry precision characteristics of this engine."""
+        return "unspecified"
+
+    @property
+    def disclosure_label(self) -> str:
+        """Returns a formatted disclosure string, e.g. 'native (kernel rusage)'."""
+        return f"{self.engine_name} ({self.precision_disclosure})"
+
     @abc.abstractmethod
     def execute(
         self,
@@ -29,6 +44,14 @@ class BaseEngine(abc.ABC):
 
 class MockEngine(BaseEngine):
     """Deterministic in-memory mock engine for testing and validation harnesses."""
+
+    @property
+    def engine_name(self) -> str:
+        return "mock"
+
+    @property
+    def precision_disclosure(self) -> str:
+        return "simulated"
 
     def execute(
         self,
@@ -63,6 +86,14 @@ class MockEngine(BaseEngine):
 
 class NativeEngine(BaseEngine):
     """Native POSIX execution engine using the Rust PyO3 FFI bridge."""
+
+    @property
+    def engine_name(self) -> str:
+        return "native"
+
+    @property
+    def precision_disclosure(self) -> str:
+        return "kernel rusage"
 
     @classmethod
     def is_available(cls) -> bool:
@@ -295,6 +326,14 @@ def _kill_process_tree(proc: subprocess.Popen[Any] | None) -> None:
 
 class SubprocessEngine(BaseEngine):
     """Cross-platform fallback execution engine using process isolation and kernel telemetry."""
+
+    @property
+    def engine_name(self) -> str:
+        return "fallback"
+
+    @property
+    def precision_disclosure(self) -> str:
+        return "wall-clock timing, approximate"
 
     def execute(
         self,

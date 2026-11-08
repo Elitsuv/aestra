@@ -213,6 +213,66 @@ class CLITests(unittest.TestCase):
             self.assertEqual(doc_data["version"], "1.1.2")
             self.assertIn("compilers", doc_data)
 
+    def test_cli_engine_disclosure(self) -> None:
+        import io
+        import json
+        from contextlib import redirect_stdout
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            sol = folder / "solution.py"
+            sol.write_text("import sys; print('DISCLOSE_OK')")
+
+            # 1. Human-readable telemetry block disclosure
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                exit_code = cli_main(["run", str(sol)])
+            self.assertEqual(exit_code, 0)
+            out = buf.getvalue()
+            self.assertIn("Engine     :", out)
+            self.assertIn("wall-clock timing, approximate", out)
+
+            # 2. run --json payload disclosure
+            buf_json = io.StringIO()
+            with redirect_stdout(buf_json):
+                exit_code = cli_main(["run", str(sol), "--json"])
+            self.assertEqual(exit_code, 0)
+            run_data = json.loads(buf_json.getvalue())
+            self.assertIn("engine", run_data)
+            self.assertIn("engine_precision", run_data)
+            self.assertEqual(run_data["engine"], "fallback")
+            self.assertEqual(
+                run_data["engine_precision"], "wall-clock timing, approximate"
+            )
+
+            # 3. test --json payload disclosure
+            cases_dir = folder / "cases"
+            cases_dir.mkdir()
+            (cases_dir / "01.in").write_text("")
+            (cases_dir / "01.out").write_text("DISCLOSE_OK\n")
+            buf_test = io.StringIO()
+            with redirect_stdout(buf_test):
+                exit_code = cli_main(
+                    ["test", str(sol), "--cases", str(cases_dir), "--json"]
+                )
+            self.assertEqual(exit_code, 0)
+            test_data = json.loads(buf_test.getvalue())
+            self.assertEqual(test_data["engine"], "fallback")
+            self.assertEqual(
+                test_data["engine_precision"], "wall-clock timing, approximate"
+            )
+
+            # 4. fuzz --json payload disclosure
+            buf_fuzz = io.StringIO()
+            with redirect_stdout(buf_fuzz):
+                exit_code = cli_main(["fuzz", str(sol), "--iterations", "2", "--json"])
+            self.assertEqual(exit_code, 0)
+            fuzz_data = json.loads(buf_fuzz.getvalue())
+            self.assertEqual(fuzz_data["engine"], "fallback")
+            self.assertEqual(
+                fuzz_data["engine_precision"], "wall-clock timing, approximate"
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

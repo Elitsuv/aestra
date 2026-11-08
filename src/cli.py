@@ -213,6 +213,8 @@ def run_command(args: argparse.Namespace) -> int:
             "stdout": result.stdout,
             "stderr": result.stderr,
             "error_message": result.error_message,
+            "engine": engine.engine_name,
+            "engine_precision": engine.precision_disclosure,
         }
         print(json.dumps(payload, indent=2))
         return 0 if result.is_success else 1
@@ -229,6 +231,7 @@ def run_command(args: argparse.Namespace) -> int:
         f"  |  Peak Memory: {Color.BOLD}{f'{result.peak_memory_mb:.1f}MB':<46}{Color.RESET} |"
     )
     print(f"  |  Exit Code  : {result.exit_code!s:<46} |")
+    print(f"  |  Engine     : {engine.disclosure_label:<46} |")
     print(
         f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}"
     )
@@ -326,6 +329,8 @@ def test_command(args: argparse.Namespace) -> int:
             "total_cpu_time_ms": round(batch_res.total_cpu_time_ms, 2),
             "max_peak_memory_mb": round(batch_res.max_peak_memory_mb, 2),
             "is_all_passed": batch_res.passed == batch_res.total,
+            "engine": runner.engine.engine_name,
+            "engine_precision": runner.engine.precision_disclosure,
             "results": [
                 {
                     "case_name": r.case_name,
@@ -351,6 +356,7 @@ def test_command(args: argparse.Namespace) -> int:
     print(
         f"  |  Limits : {f'{limits.time_limit_ms}ms CPU, {limits.memory_limit_mb}MB RAM':<48} |"
     )
+    print(f"  |  Engine : {runner.engine.disclosure_label:<48} |")
     print(
         f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}\n"
     )
@@ -421,25 +427,28 @@ def fuzz_command(args: argparse.Namespace) -> int:
     iterations = getattr(args, "iterations", 50)
     should_minimize = getattr(args, "minimize", False)
 
-    print(
-        f"\n  {Color.CYAN}+-- [Concurrent Fuzzer] --------------------------------------+{Color.RESET}"
-    )
-    print(f"  |  Target     : {target_exec.name:<45} |")
-    print(
-        f"  |  Oracle     : {(oracle_path.name if oracle_path else 'Crash & limit check'):<45} |"
-    )
-    print(f"  |  Iterations : {iterations:<45} |")
-    print(f"  |  Workers    : {workers:<45} |")
-    print(
-        f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}\n"
-    )
-
     fuzzer = Fuzzer(
         target_binary=target_exec,
         oracle=oracle_path,
         timeout_ms=args.time_limit,
         memory_limit_mb=args.memory_limit,
     )
+
+    if not getattr(args, "json", False):
+        print(
+            f"\n  {Color.CYAN}+-- [Concurrent Fuzzer] --------------------------------------+{Color.RESET}"
+        )
+        print(f"  |  Target     : {target_exec.name:<45} |")
+        print(
+            f"  |  Oracle     : {(oracle_path.name if oracle_path else 'Crash & limit check'):<45} |"
+        )
+        print(f"  |  Iterations : {iterations:<45} |")
+        print(f"  |  Workers    : {workers:<45} |")
+        print(f"  |  Engine     : {fuzzer.engine.disclosure_label:<45} |")
+        print(
+            f"  {Color.CYAN}+-------------------------------------------------------------+{Color.RESET}\n"
+        )
+
     res = fuzzer.run(iterations=iterations, workers=workers)
 
     minimized_inp: str | None = None
@@ -459,6 +468,8 @@ def fuzz_command(args: argparse.Namespace) -> int:
             "minimized_input": minimized_inp,
             "oracle_output": res.oracle_output,
             "error_message": res.error_message,
+            "engine": fuzzer.engine.engine_name,
+            "engine_precision": fuzzer.engine.precision_disclosure,
         }
         print(json.dumps(payload, indent=2))
         return 1 if res.found_bug else 0
