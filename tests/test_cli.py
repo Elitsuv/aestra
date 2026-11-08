@@ -273,6 +273,45 @@ class CLITests(unittest.TestCase):
                 fuzz_data["engine_precision"], "wall-clock timing, approximate"
             )
 
+    def test_cli_no_color_support(self) -> None:
+        import io
+        import os
+        from contextlib import redirect_stdout
+        from unittest.mock import patch
+
+        from src.cli import Color
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            sol = folder / "solution.py"
+            sol.write_text("import sys; print('NO_COLOR_TEST')")
+
+            # 1. Test --no-color flag strips ANSI escape codes
+            buf_flag = io.StringIO()
+            with redirect_stdout(buf_flag):
+                exit_code = cli_main(["run", str(sol), "--no-color"])
+            self.assertEqual(exit_code, 0)
+            flag_output = buf_flag.getvalue()
+            self.assertNotIn("\033[", flag_output)
+            self.assertIn("NO_COLOR_TEST", flag_output)
+            self.assertFalse(Color.is_enabled())
+
+            # 2. Test NO_COLOR environment variable strips ANSI escape codes
+            Color.enable()
+            self.assertTrue(Color.is_enabled())
+            with patch.dict(os.environ, {"NO_COLOR": "1"}):
+                buf_env = io.StringIO()
+                with redirect_stdout(buf_env):
+                    exit_code = cli_main(["run", str(sol)])
+                self.assertEqual(exit_code, 0)
+                env_output = buf_env.getvalue()
+                self.assertNotIn("\033[", env_output)
+                self.assertIn("NO_COLOR_TEST", env_output)
+                self.assertFalse(Color.is_enabled())
+
+            # Reset Color to enabled state for subsequent tests
+            Color.enable()
+
 
 if __name__ == "__main__":
     unittest.main()
