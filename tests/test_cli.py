@@ -273,6 +273,61 @@ class CLITests(unittest.TestCase):
                 fuzz_data["engine_precision"], "wall-clock timing, approximate"
             )
 
+    def test_cli_float_checker_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            sol = folder / "solution.py"
+            # Output is 3.14159
+            sol.write_text("import sys; print('3.14159')")
+
+            cases_dir = folder / "cases"
+            cases_dir.mkdir()
+            (cases_dir / "01.in").write_text("")
+            # Expected is 3.14160 (difference is 0.00001 = 1e-5)
+            (cases_dir / "01.out").write_text("3.14160\n")
+
+            # 1. Under default token mode, 3.14159 != 3.14160 -> Failure
+            exit_code_token = cli_main(
+                ["test", str(sol), "--cases", str(cases_dir), "--mode", "token"]
+            )
+            self.assertEqual(exit_code_token, 1)
+
+            # 2. Under float mode with default epsilon (1e-4), diff 1e-5 < 1e-4 -> Accepted (0)
+            exit_code_float = cli_main(
+                ["test", str(sol), "--cases", str(cases_dir), "--mode", "float"]
+            )
+            self.assertEqual(exit_code_float, 0)
+
+            # 3. Under float mode with strict epsilon (1e-6), diff 1e-5 > 1e-6 -> Failure (1)
+            exit_code_strict = cli_main(
+                [
+                    "test",
+                    str(sol),
+                    "--cases",
+                    str(cases_dir),
+                    "--mode",
+                    "float",
+                    "--epsilon",
+                    "1e-6",
+                ]
+            )
+            self.assertEqual(exit_code_strict, 1)
+
+            # 4. Fuzz mode supports --mode float
+            exit_code_fuzz = cli_main(
+                [
+                    "fuzz",
+                    str(sol),
+                    "--iterations",
+                    "2",
+                    "--mode",
+                    "float",
+                    "--epsilon",
+                    "1e-4",
+                ]
+            )
+            self.assertEqual(exit_code_fuzz, 0)
+
     def test_cli_no_color_support(self) -> None:
         import io
         import os

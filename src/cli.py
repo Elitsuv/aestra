@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from src.checker import CheckerMode
+from src.checker import BaseChecker, CheckerMode, FloatToleranceChecker, OutputChecker
 from src.compiler import CompilationError, CompilerManager
 from src.config import ExecutionLimits
 from src.engine import NativeEngine, get_engine
@@ -340,12 +340,20 @@ def test_command(args: argparse.Namespace) -> int:
         print(f"Error: Cases directory '{cases_dir}' not found.", file=sys.stderr)
         return 1
 
-    mode_map = {
-        "token": CheckerMode.TOKEN,
-        "exact": CheckerMode.EXACT,
-        "ignore_whitespace": CheckerMode.IGNORE_WHITESPACE,
-    }
-    mode = mode_map.get(args.mode.lower(), CheckerMode.TOKEN)
+    mode_str = args.mode.lower()
+    epsilon_val = getattr(args, "epsilon", 1e-4)
+    checker: BaseChecker
+    if mode_str == "float":
+        checker = FloatToleranceChecker(epsilon=epsilon_val)
+        mode = CheckerMode.TOKEN
+    else:
+        mode_map = {
+            "token": CheckerMode.TOKEN,
+            "exact": CheckerMode.EXACT,
+            "ignore_whitespace": CheckerMode.IGNORE_WHITESPACE,
+        }
+        mode = mode_map.get(mode_str, CheckerMode.TOKEN)
+        checker = OutputChecker(mode=mode)
 
     limits = ExecutionLimits(
         time_limit_ms=args.time_limit,
@@ -367,10 +375,17 @@ def test_command(args: argparse.Namespace) -> int:
     if getattr(args, "json", False):
         batch_res = (
             runner.evaluate_cases(
-                source_path, cases, limits, mode=mode, workers=workers
+                source_path,
+                cases,
+                limits,
+                mode=mode,
+                checker=checker,
+                workers=workers,
             )
             if hasattr(runner, "evaluate_cases")
-            else runner.run_batch(source_path, cases_dir, limits, mode=mode)
+            else runner.run_batch(
+                source_path, cases_dir, limits, mode=mode, checker=checker
+            )
         )
         payload = {
             "overall_verdict": batch_res.overall_verdict,
@@ -412,9 +427,13 @@ def test_command(args: argparse.Namespace) -> int:
     )
 
     batch_res = (
-        runner.evaluate_cases(source_path, cases, limits, mode=mode, workers=workers)
+        runner.evaluate_cases(
+            source_path, cases, limits, mode=mode, checker=checker, workers=workers
+        )
         if hasattr(runner, "evaluate_cases")
-        else runner.run_batch(source_path, cases_dir, limits, mode=mode)
+        else runner.run_batch(
+            source_path, cases_dir, limits, mode=mode, checker=checker
+        )
     )
 
     for res in batch_res.results:
@@ -477,11 +496,27 @@ def fuzz_command(args: argparse.Namespace) -> int:
     iterations = getattr(args, "iterations", 50)
     should_minimize = getattr(args, "minimize", False)
 
+    fuzz_mode_str = getattr(args, "mode", "token").lower()
+    fuzz_epsilon = getattr(args, "epsilon", 1e-4)
+    fuzz_checker: BaseChecker
+    if fuzz_mode_str == "float":
+        fuzz_checker = FloatToleranceChecker(epsilon=fuzz_epsilon)
+    else:
+        fuzz_mode_map = {
+            "token": CheckerMode.TOKEN,
+            "exact": CheckerMode.EXACT,
+            "ignore_whitespace": CheckerMode.IGNORE_WHITESPACE,
+        }
+        fuzz_checker = OutputChecker(
+            mode=fuzz_mode_map.get(fuzz_mode_str, CheckerMode.TOKEN)
+        )
+
     fuzzer = Fuzzer(
         target_binary=target_exec,
         oracle=oracle_path,
         timeout_ms=args.time_limit,
         memory_limit_mb=args.memory_limit,
+        checker=fuzz_checker,
     )
 
     if not getattr(args, "json", False):
@@ -979,9 +1014,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     test_parser.add_argument(
         "--mode",
-        choices=["token", "exact", "ignore_whitespace"],
+        choices=["token", "exact", "ignore_whitespace", "float"],
         default="token",
-        help="Output comparison mode (default: token)",
+        help="Output comparison mode: token, exact, ignore_whitespace, or float (default: token)",
+    )
+    test_parser.add_argument(
+        "--epsilon",
+        type=float,
+        default=1e-4,
+        help="Tolerance for floating-point comparisons when --mode float is used (default: 1e-4)",
     )
     test_parser.add_argument(
         "--time-limit",
@@ -1036,6 +1077,18 @@ def main(argv: list[str] | None = None) -> int:
         "--minimize",
         action="store_true",
         help="Automatically delta-debug minimize failing testcase if a bug is found",
+    )
+    fuzz_parser.add_argument(
+        "--mode",
+        choices=["token", "exact", "ignore_whitespace", "float"],
+        default="token",
+        help="Output comparison mode against oracle: token, exact, ignore_whitespace, or float (default: token)",
+    )
+    fuzz_parser.add_argument(
+        "--epsilon",
+        type=float,
+        default=1e-4,
+        help="Tolerance for floating-point comparisons when --mode float is used (default: 1e-4)",
     )
     fuzz_parser.add_argument(
         "--json",
