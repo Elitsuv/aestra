@@ -1,0 +1,407 @@
+name: Sync Labels
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode (preview changes without modifying labels)'
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  issues: write
+
+jobs:
+  sync-labels:
+    name: Sync Issue & PR Labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Synchronize Labels
+        uses: actions/github-script@v7
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        with:
+          script: |
+            const dryRun = process.env.DRY_RUN !== 'false';
+            const { owner, repo } = context.repo;
+
+            core.info(`Running Label Sync for ${owner}/${repo}`);
+            core.info(`Mode: ${dryRun ? 'DRY RUN (Preview only, no changes will be applied)' : 'LIVE RUN (Modifications will be executed)'}`);
+
+            // 1. Target labels definition
+            const TARGET_LABELS = [
+              // area:
+              { name: 'area: sandbox', color: '1d76db', description: 'Process isolation, resource limits, execution' },
+              { name: 'area: telemetry', color: '1d76db', description: 'CPU time, peak memory, accounting' },
+              { name: 'area: fuzzer', color: '1d76db', description: 'Fuzzer and test-case minimizer' },
+              { name: 'area: compiler', color: '1d76db', description: 'Compilation and binary cache' },
+              { name: 'area: cli', color: '1d76db', description: 'Terminal UX, output, progress' },
+              { name: 'area: interactive', color: '1d76db', description: 'Interactive shell and dashboard' },
+              { name: 'area: install', color: '1d76db', description: 'MSI, winget, pip, PATH, first run' },
+              { name: 'area: runner', color: '1d76db', description: 'Batch runner and verdicts' },
+              { name: 'area: sdk', color: '1d76db', description: 'Python SDK and JSON contract' },
+              { name: 'area: docs', color: '1d76db', description: 'README, guides, examples' },
+              { name: 'area: ci-cd', color: '1d76db', description: 'Workflows, builds, release automation' },
+              { name: 'area: branding', color: '1d76db', description: 'Logo, icons, visual identity' },
+
+              // type:
+              { name: 'type: bug', color: 'd73a4a', description: 'Confirmed defect' },
+              { name: 'type: feature', color: '0e8a16', description: 'New capability' },
+              { name: 'type: enhancement', color: '84b6eb', description: 'Improvement to existing behavior' },
+              { name: 'type: perf', color: 'f9a825', description: 'Performance or footprint' },
+              { name: 'type: refactor', color: 'e4e669', description: 'Internal change, no behavior change' },
+              { name: 'type: docs', color: '0075ca', description: 'Documentation only' },
+              { name: 'type: test', color: 'd4c5f9', description: 'Tests' },
+              { name: 'type: chore', color: 'cfd3d7', description: 'Maintenance, tooling, release housekeeping' },
+              { name: 'type: design', color: 'e99695', description: 'Visual or UX polish' },
+
+              // priority:
+              { name: 'priority: p0-critical', color: 'b60205', description: 'Blocks release or breaks core flow' },
+              { name: 'priority: p1-high', color: 'd93f0b', description: 'Should land in the current release' },
+              { name: 'priority: p2-medium', color: 'fbca04', description: 'Planned, not urgent' },
+              { name: 'priority: p3-low', color: '0e8a16', description: 'Nice to have' },
+
+              // status:
+              { name: 'status: needs-triage', color: 'ededed', description: 'Not yet reviewed' },
+              { name: 'status: ready', color: 'c2e0c6', description: 'Scoped and ready to pick up' },
+              { name: 'status: in-progress', color: 'fef2c0', description: 'Being worked on' },
+              { name: 'status: in-review', color: 'bfd4f2', description: 'PR open' },
+              { name: 'status: blocked', color: 'b60205', description: 'Waiting on something' },
+
+              // resolution:
+              { name: 'resolution: duplicate', color: 'cfd3d7', description: 'Already tracked elsewhere' },
+              { name: 'resolution: wontfix', color: 'cfd3d7', description: 'Will not be addressed' },
+              { name: 'resolution: invalid', color: 'cfd3d7', description: 'Not a valid report' },
+
+              // platform:
+              { name: 'platform: windows', color: '0052cc', description: 'Windows-specific' },
+              { name: 'platform: linux', color: '0052cc', description: 'Linux-specific' },
+              { name: 'platform: macos', color: '0052cc', description: 'macOS-specific' },
+
+              // breaking-change
+              { name: 'breaking-change', color: 'b60205', description: 'Changes the CLI, JSON contract, or SDK behavior' },
+            ];
+
+            // Mapping for renaming legacy labels (preserves issue associations)
+            const RENAME_MAP = [
+              { oldName: 'bug', newName: 'type: bug' },
+              { oldName: 'enhancement', newName: 'type: enhancement' },
+              { oldName: 'documentation', newName: 'type: docs' },
+              { oldName: 'duplicate', newName: 'resolution: duplicate' },
+              { oldName: 'wontfix', newName: 'resolution: wontfix' },
+              { oldName: 'invalid', newName: 'resolution: invalid' },
+            ];
+
+            // 1. Fetch ALL existing labels with github.paginate
+            core.info('Fetching all existing repository labels...');
+            let existingLabels = [];
+            try {
+              existingLabels = await github.paginate(
+                github.rest.issues.listLabelsForRepo,
+                { owner, repo, per_page: 100 }
+              );
+              core.info(`Retrieved ${existingLabels.length} existing label(s).`);
+            } catch (err) {
+              core.setFailed(`Failed to fetch existing labels from repository: ${err.message}`);
+              return;
+            }
+
+            // Map lowercase name -> { name, color, description }
+            const currentMap = new Map();
+            for (const label of existingLabels) {
+              currentMap.set(label.name.toLowerCase(), {
+                name: label.name,
+                color: (label.color || '').toLowerCase(),
+                description: label.description || '',
+              });
+            }
+
+            // Map of target labels by lowercase name
+            const targetMap = new Map();
+            for (const target of TARGET_LABELS) {
+              targetMap.set(target.name.toLowerCase(), target);
+            }
+
+            const actions = [];
+            const errors = [];
+            let unchangedCount = 0;
+
+            // 2. RENAME: Rename legacy labels if they exist
+            for (const { oldName, newName } of RENAME_MAP) {
+              const oldKey = oldName.toLowerCase();
+              const newKey = newName.toLowerCase();
+
+              if (currentMap.has(oldKey)) {
+                const existingOld = currentMap.get(oldKey);
+                const targetMeta = targetMap.get(newKey);
+
+                if (currentMap.has(newKey)) {
+                  core.warning(
+                    `Cannot rename "${existingOld.name}" to "${newName}" because "${newName}" already exists. "${existingOld.name}" will be marked for deletion if not in target set.`
+                  );
+                  continue;
+                }
+
+                actions.push({
+                  action: 'RENAME',
+                  label: `${existingOld.name} -> ${targetMeta.name}`,
+                  color: targetMeta.color,
+                  details: `Preserve existing issues: rename to "${targetMeta.name}" (color: #${targetMeta.color}, desc: "${targetMeta.description}")`,
+                });
+
+                if (!dryRun) {
+                  try {
+                    await github.rest.issues.updateLabel({
+                      owner,
+                      repo,
+                      name: existingOld.name,
+                      new_name: targetMeta.name,
+                      color: targetMeta.color,
+                      description: targetMeta.description,
+                    });
+                    currentMap.delete(oldKey);
+                    currentMap.set(newKey, {
+                      name: targetMeta.name,
+                      color: targetMeta.color.toLowerCase(),
+                      description: targetMeta.description,
+                    });
+                    core.info(`✓ Renamed label "${existingOld.name}" -> "${targetMeta.name}"`);
+                  } catch (err) {
+                    errors.push({
+                      action: 'RENAME',
+                      label: `${existingOld.name} -> ${targetMeta.name}`,
+                      error: err.message,
+                    });
+                    core.error(`Failed to rename label "${existingOld.name}" to "${targetMeta.name}": ${err.message}`);
+                  }
+                } else {
+                  currentMap.delete(oldKey);
+                  currentMap.set(newKey, {
+                    name: targetMeta.name,
+                    color: targetMeta.color.toLowerCase(),
+                    description: targetMeta.description,
+                  });
+                }
+              }
+            }
+
+            // 3. CREATE missing target labels, UPDATE color/description of existing ones (case-insensitive)
+            for (const target of TARGET_LABELS) {
+              const key = target.name.toLowerCase();
+              const existing = currentMap.get(key);
+
+              if (!existing) {
+                actions.push({
+                  action: 'CREATE',
+                  label: target.name,
+                  color: target.color,
+                  details: target.description,
+                });
+
+                if (!dryRun) {
+                  try {
+                    await github.rest.issues.createLabel({
+                      owner,
+                      repo,
+                      name: target.name,
+                      color: target.color,
+                      description: target.description,
+                    });
+                    currentMap.set(key, {
+                      name: target.name,
+                      color: target.color.toLowerCase(),
+                      description: target.description,
+                    });
+                    core.info(`✓ Created label "${target.name}"`);
+                  } catch (err) {
+                    errors.push({
+                      action: 'CREATE',
+                      label: target.name,
+                      error: err.message,
+                    });
+                    core.error(`Failed to create label "${target.name}": ${err.message}`);
+                  }
+                }
+              } else {
+                const nameDiff = existing.name !== target.name;
+                const colorDiff = (existing.color || '').toLowerCase() !== target.color.toLowerCase();
+                const descDiff = (existing.description || '') !== (target.description || '');
+
+                if (nameDiff || colorDiff || descDiff) {
+                  const diffNotes = [];
+                  if (nameDiff) diffNotes.push(`case: "${existing.name}" -> "${target.name}"`);
+                  if (colorDiff) diffNotes.push(`color: #${existing.color} -> #${target.color}`);
+                  if (descDiff) diffNotes.push(`desc: "${existing.description || ''}" -> "${target.description}"`);
+
+                  actions.push({
+                    action: 'UPDATE',
+                    label: target.name,
+                    color: target.color,
+                    details: diffNotes.join(', '),
+                  });
+
+                  if (!dryRun) {
+                    try {
+                      await github.rest.issues.updateLabel({
+                        owner,
+                        repo,
+                        name: existing.name,
+                        new_name: target.name,
+                        color: target.color,
+                        description: target.description,
+                      });
+                      currentMap.set(key, {
+                        name: target.name,
+                        color: target.color.toLowerCase(),
+                        description: target.description,
+                      });
+                      core.info(`✓ Updated label "${target.name}" (${diffNotes.join(', ')})`);
+                    } catch (err) {
+                      errors.push({
+                        action: 'UPDATE',
+                        label: target.name,
+                        error: err.message,
+                      });
+                      core.error(`Failed to update label "${existing.name}": ${err.message}`);
+                    }
+                  }
+                } else {
+                  unchangedCount++;
+                }
+              }
+            }
+
+            // 4. PRUNE: delete every existing label that is not in the target set
+            for (const [key, existing] of currentMap.entries()) {
+              if (!targetMap.has(key)) {
+                actions.push({
+                  action: 'DELETE',
+                  label: existing.name,
+                  color: existing.color,
+                  details: 'Prune: not in target set',
+                });
+
+                if (!dryRun) {
+                  try {
+                    await github.rest.issues.deleteLabel({
+                      owner,
+                      repo,
+                      name: existing.name,
+                    });
+                    currentMap.delete(key);
+                    core.info(`✓ Deleted label "${existing.name}"`);
+                  } catch (err) {
+                    errors.push({
+                      action: 'DELETE',
+                      label: existing.name,
+                      error: err.message,
+                    });
+                    core.error(`Failed to delete label "${existing.name}": ${err.message}`);
+                  }
+                }
+              }
+            }
+
+            // 5. In dry_run mode, change nothing and print a table of CREATE / UPDATE / RENAME / DELETE
+            const counts = {
+              RENAME: actions.filter(a => a.action === 'RENAME').length,
+              CREATE: actions.filter(a => a.action === 'CREATE').length,
+              UPDATE: actions.filter(a => a.action === 'UPDATE').length,
+              DELETE: actions.filter(a => a.action === 'DELETE').length,
+            };
+
+            const colAction = 8;
+            const colLabel = 36;
+            const colColor = 9;
+            const pad = (str, len) => (str || '').padEnd(len).slice(0, len);
+
+            core.info('');
+            core.info('='.repeat(105));
+            core.info(dryRun ? '                   🏷️  SYNC LABELS EXECUTION PLAN (DRY RUN)' : '                   🏷️  SYNC LABELS EXECUTION RESULTS');
+            core.info('='.repeat(105));
+
+            if (actions.length === 0) {
+              core.info('No changes needed. All existing repository labels already match the target set.');
+            } else {
+              core.info(`| ${pad('ACTION', colAction)} | ${pad('LABEL', colLabel)} | ${pad('COLOR', colColor)} | DETAILS`);
+              core.info(`|-${'-'.repeat(colAction)}-|-${'-'.repeat(colLabel)}-|-${'-'.repeat(colColor)}-|-${'-'.repeat(45)}`);
+              for (const a of actions) {
+                core.info(`| ${pad(a.action, colAction)} | ${pad(a.label, colLabel)} | ${pad('#' + (a.color || ''), colColor)} | ${a.details}`);
+              }
+            }
+
+            // 6. Print a summary at the end. Handle API errors per label without aborting the whole run.
+            core.info('');
+            core.info('='.repeat(105));
+            core.info('                                        SUMMARY');
+            core.info('='.repeat(105));
+            core.info(`Mode:       ${dryRun ? 'DRY RUN (preview only, no modifications made)' : 'APPLIED (live run completed)'}`);
+            core.info(`RENAME:     ${counts.RENAME}`);
+            core.info(`CREATE:     ${counts.CREATE}`);
+            core.info(`UPDATE:     ${counts.UPDATE}`);
+            core.info(`DELETE:     ${counts.DELETE}`);
+            core.info(`UNCHANGED:  ${unchangedCount}`);
+            core.info(`ERRORS:     ${errors.length}`);
+            core.info('='.repeat(105));
+
+            // Generate GitHub Actions Step Summary
+            try {
+              const summary = core.summary
+                .addHeading(dryRun ? '🏷️ Label Sync (Dry Run Preview)' : '🏷️ Label Sync Results', 2)
+                .addRaw(
+                  dryRun
+                    ? '> ℹ️ **Dry run mode is enabled.** The table below displays planned changes. No repository labels were modified.'
+                    : '> 🚀 **Live execution completed.** The operations below have been applied to repository labels.'
+                )
+                .addHeading('Summary', 3)
+                .addTable([
+                  [{ data: 'Action', header: true }, { data: 'Count', header: true }],
+                  ['RENAME', String(counts.RENAME)],
+                  ['CREATE', String(counts.CREATE)],
+                  ['UPDATE', String(counts.UPDATE)],
+                  ['DELETE (Prune)', String(counts.DELETE)],
+                  ['UNCHANGED', String(unchangedCount)],
+                  ['ERRORS', String(errors.length)],
+                ]);
+
+              if (actions.length > 0) {
+                summary.addHeading(dryRun ? 'Planned Actions' : 'Executed Actions', 3);
+                summary.addTable([
+                  [
+                    { data: 'Action', header: true },
+                    { data: 'Label', header: true },
+                    { data: 'Color', header: true },
+                    { data: 'Details', header: true },
+                  ],
+                  ...actions.map(a => [
+                    a.action,
+                    `\`${a.label}\``,
+                    `\`#${a.color || ''}\``,
+                    a.details,
+                  ]),
+                ]);
+              } else {
+                summary.addRaw('\n*All labels are synchronized with the target configuration.*');
+              }
+
+              if (errors.length > 0) {
+                summary.addHeading('❌ Errors Encountered', 3);
+                summary.addTable([
+                  [
+                    { data: 'Action', header: true },
+                    { data: 'Label', header: true },
+                    { data: 'Error Message', header: true },
+                  ],
+                  ...errors.map(e => [e.action, `\`${e.label}\``, e.error]),
+                ]);
+              }
+
+              await summary.write();
+            } catch (summaryErr) {
+              core.warning(`Failed to write step summary: ${summaryErr.message}`);
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(`Label synchronization encountered ${errors.length} error(s). Review logs above.`);
+            }
